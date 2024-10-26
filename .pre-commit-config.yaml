@@ -1,0 +1,34 @@
+repos:
+-   repo: local
+    hooks:
+    -   id: ruff
+        name: ruff
+        description: Format the code
+        entry: poetry run ruff format .
+        pass_filenames: false # run once per commit rather than file
+        language: system
+    -   id: isort
+        name: isort
+        description: Keep imports in a nice sorted order
+        entry: poetry run isort .
+        pass_filenames: false
+        language: system
+    # -   id: mypy
+    #     name: mypy
+    #     description: Verify types statically
+    #     entry: poetry run mypy
+    #     pass_filenames: false
+    #     language: system
+    -   id: poetry
+        name: poetry
+        description: Validates the content of the pyproject.toml file and its consistency with the poetry.lock file
+        entry: poetry check
+        pass_filenames: false
+        language: system
+    - id: poetry-export-service
+      name: poetry-export
+      description: Exports requirements-service.txt file for docker container
+      entry: poetry export
+      args: [ "--with", "service", "-o", "requirements-service.txt" ]
+      pass_filenames: false
+      language: system
