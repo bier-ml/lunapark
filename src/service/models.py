@@ -6,7 +6,7 @@ in the candidate-position matching service.
 """
 
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -44,4 +44,10 @@ class MatchResponse(BaseModel):
     description: Optional[str] = Field(
         default=None,
         description="Optional explanation of the matching result",
+    )
+
+
+class AvailableModelsResponse(BaseModel):
+    predictor_types: List[PredictorType] = Field(
+        description="List of available predictor types that can be used for matching"
     )
