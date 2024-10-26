@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple
+from typing import List, Tuple
 
 
 class BasePredictor(ABC):
@@ -8,9 +8,9 @@ class BasePredictor(ABC):
     @abstractmethod
     def predict(
         self, candidate_description: str, vacancy_description: str
-    ) -> Tuple[float, Optional[str]]:
+    ) -> Tuple[float, str]:
         """
-        Predict match score and generate description for candidate-vacancy pair.
+        Predict match score between candidate and vacancy.
 
         Args:
             candidate_description (str): Description of the candidate's experience and skills
@@ -21,4 +21,10 @@ class BasePredictor(ABC):
                 - float: Match score between 0 and 1
                 - str: Detailed description of the match analysis
         """
-        raise NotImplementedError("Subclasses must implement the predict method")
+        pass
+
+    @classmethod
+    @abstractmethod
+    def get_available_models(cls) -> Tuple[str]:
+        """Return tuple of available models for this predictor."""
+        pass

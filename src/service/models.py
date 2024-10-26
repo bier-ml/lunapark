@@ -6,7 +6,7 @@ in the candidate-position matching service.
 """
 
 from enum import Enum
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -17,11 +17,23 @@ class PredictorType(str, Enum):
     # Add more predictor types here as they are implemented
 
 
+class PredictorParameters(BaseModel):
+    api_base_url: Optional[str] = Field(
+        default=None, description="Base URL for the language model API"
+    )
+    api_key: Optional[str] = Field(
+        default=None, description="API key for the language model service"
+    )
+    model: Optional[str] = Field(
+        default=None, description="Model identifier to use for prediction"
+    )
+
+
 class MatchRequest(BaseModel):
     vacancy_description: str = Field(
-        ...,  # ... means the field is required
+        ...,
         description="The job description or requirements for the position",
-        min_length=10,  # Ensure some minimal content
+        min_length=10,
     )
     candidate_description: str = Field(
         ...,
@@ -31,6 +43,9 @@ class MatchRequest(BaseModel):
     predictor_type: PredictorType = Field(
         default=PredictorType.DUMMY,
         description="The type of predictor to use for matching",
+    )
+    predictor_parameters: Optional[PredictorParameters] = Field(
+        default=None, description="Optional parameters for the predictor configuration"
     )
 
 
@@ -50,4 +65,10 @@ class MatchResponse(BaseModel):
 class AvailableModelsResponse(BaseModel):
     predictor_types: List[PredictorType] = Field(
         description="List of available predictor types that can be used for matching"
+    )
+
+
+class AvailableModelsPerPredictorResponse(BaseModel):
+    models: Dict[PredictorType, List[str]] = Field(
+        description="Dictionary mapping predictor types to their available models"
     )
