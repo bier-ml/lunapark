@@ -4,11 +4,8 @@ version = "0.2.0"
 description = ""
 authors = ["Konstantin.Grotov <konstantin.grotov@gmail.com>"]
 readme = "README.md"
-
 packages = [
-    { include = "app" },
-    { include = "service" },
-    { include = "platform" }
+    { include = "src" },
 ]
 
 [tool.poetry.dependencies]

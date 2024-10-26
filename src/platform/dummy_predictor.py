@@ -1,7 +1,7 @@
 import random
 from typing import Optional
 
-from platform.base_predictor import BasePredictor
+from src.platform.base_predictor import BasePredictor
 
 
 class DummyPredictor(BasePredictor):

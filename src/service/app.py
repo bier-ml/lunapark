@@ -1,7 +1,7 @@
 import uvicorn
 from fastapi import FastAPI, HTTPException
-from service.models import MatchRequest, MatchResponse
-from platform.dummy_predictor import DummyPredictor
+from src.service.models import MatchRequest, MatchResponse
+from src.platform.dummy_predictor import DummyPredictor
 
 app = FastAPI(
     title="Candidate Scoring API",

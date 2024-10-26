@@ -10,7 +10,7 @@ from typing import Dict, NoReturn
 
 import requests
 from fastapi.testclient import TestClient
-from app import app  # Updated import
+from app import app
 
 client = TestClient(app)
 
@@ -19,7 +19,7 @@ def test_prediction_endpoint() -> NoReturn:
     """
     Test the prediction endpoint of the matching API.
 
-    Sends a POST request to the /predict endpoint with sample candidate
+    Sends a POST request to the /match endpoint with sample candidate
     and position data, then prints the response.
 
     Returns:
@@ -30,12 +30,13 @@ def test_prediction_endpoint() -> NoReturn:
     """
 
     # API endpoint URL
-    url: str = "http://localhost:8000/predict"
+    url: str = "http://localhost:8000/match"
 
     # Test data
     test_data: Dict[str, str] = {
-        "candidate_features": "5 years of Python experience, Masters in Computer Science, Machine Learning and FastAPI expertise",
-        "position_features": "3+ years Python experience required, Bachelor's degree in Computer Science, ML and FastAPI knowledge required",
+        "vacancy_description": "3+ years Python experience required, Bachelor's degree in Computer Science, ML and FastAPI knowledge required",
+        "candidate_description": "5 years of Python experience, Masters in Computer Science, Machine Learning and FastAPI expertise",
+        "predictor_type": "dummy"
     }
 
     try:
