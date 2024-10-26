@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -15,7 +15,7 @@ class LMPredictor(BasePredictor):
     def __init__(
         self,
         api_base_url: str = "http://localhost:1234/v1",  # Default for local LM Studio
-        api_key: str = "not-needed",  # LM Studio doesn't need real key
+        api_key: str = "not-needed",  # LM Studio, for example, doesn't need real key
         model: str = "local-model",
         temperature: float = 0.7,
         max_tokens: int = 4096,
@@ -146,3 +146,11 @@ class LMPredictor(BasePredictor):
             List of prediction results
         """
         return [self.predict(input_data) for input_data in input_data_list]
+
+    @classmethod
+    def get_available_models(cls) -> Tuple[str]:
+        return (
+            "QuantFactory/Meta-Llama-3-8B-GGUF",
+            "mistralai/Mistral-7B-v0.1",
+            "meta-llama/Llama-2-7b-chat-hf",
+        )  # Add your actual available models here
