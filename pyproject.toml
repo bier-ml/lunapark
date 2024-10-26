@@ -5,11 +5,12 @@ description = ""
 authors = ["Konstantin.Grotov <konstantin.grotov@gmail.com>"]
 readme = "README.md"
 packages = [
-    { include = "src" },
+    { include = "src", from = "." },
 ]
 
 [tool.poetry.dependencies]
 python = "^3.11"
+types-requests = "^2.31.0"
 
 
 [tool.poetry.group.research.dependencies]
@@ -38,4 +39,4 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-web = "streamlit:run_script app/streamlit_app.py"
+web = "src.app.streamlit_app:run_script"
