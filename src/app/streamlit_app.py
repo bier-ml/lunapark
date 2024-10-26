@@ -9,7 +9,7 @@ with detailed analysis.
 
 import os
 from http import HTTPStatus
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import requests
 import streamlit as st
@@ -41,14 +41,32 @@ def display_header() -> None:
     """)
 
 
+def get_available_predictors() -> List[str]:
+    """Fetch available predictor types from the API."""
+    try:
+        response = requests.get(f"{API_URL}/available-models", timeout=10)
+
+        if response.status_code == HTTPStatus.OK:
+            data = response.json()
+            return data["predictor_types"]
+
+        st.error(
+            f"Failed to fetch available models: {response.status_code} - {response.text}"
+        )
+        return ["dummy"]  # Fallback to dummy predictor
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"Connection Error while fetching models: {str(e)}")
+        return ["dummy"]  # Fallback to dummy predictor
+
+
 def get_predictor_selection() -> str:
     """Get the selected prediction algorithm from the user."""
+    available_predictors = get_available_predictors()
+
     return st.selectbox(
         "Select matching algorithm 🔍",
-        options=[
-            "dummy",
-            "lm",
-        ],
+        options=available_predictors,
         index=0,
         help="Choose which algorithm to use for matching:\n"
         "- Dummy: Simple text matching\n"
