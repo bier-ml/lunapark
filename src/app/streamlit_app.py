@@ -60,11 +60,31 @@ def get_available_predictors() -> List[str]:
         return ["dummy"]  # Fallback to dummy predictor
 
 
-def get_predictor_selection() -> str:
-    """Get the selected prediction algorithm from the user."""
-    available_predictors = get_available_predictors()
+def get_available_models_per_predictor() -> dict:
+    """Fetch available models for each predictor type from the API."""
+    try:
+        response = requests.get(f"{API_URL}/available-models-per-predictor", timeout=10)
 
-    return st.selectbox(
+        if response.status_code == HTTPStatus.OK:
+            data = response.json()
+            return data["models"]
+
+        st.error(
+            f"Failed to fetch available models: {response.status_code} - {response.text}"
+        )
+        return {}
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"Connection Error while fetching models: {str(e)}")
+        return {}
+
+
+def get_predictor_selection() -> Tuple[str, Optional[str]]:
+    """Get the selected prediction algorithm and model from the user."""
+    available_predictors = get_available_predictors()
+    models_per_predictor = get_available_models_per_predictor()
+
+    predictor_type = st.selectbox(
         "Select matching algorithm 🔍",
         options=available_predictors,
         index=0,
@@ -73,9 +93,24 @@ def get_predictor_selection() -> str:
         "- LM: Language Model-based matching using AI\n",
     )
 
+    # Show model selection only if we have models for the selected predictor
+    selected_model = None
+    if predictor_type in models_per_predictor and models_per_predictor[predictor_type]:
+        selected_model = st.selectbox(
+            "Select model 🤖",
+            options=models_per_predictor[predictor_type],
+            index=0,
+            help="Choose which specific model to use for the selected algorithm",
+        )
+
+    return predictor_type, selected_model
+
 
 def get_match_score(
-    vacancy_text: str, candidate_text: str, predictor_type: str
+    vacancy_text: str,
+    candidate_text: str,
+    predictor_type: str,
+    model: Optional[str] = None,
 ) -> Tuple[float, Optional[str]]:
     """
     Get match score from the API.
@@ -84,19 +119,26 @@ def get_match_score(
         vacancy_text: The job vacancy description
         candidate_text: The candidate's description/CV
         predictor_type: The type of prediction algorithm to use
+        model: The specific model to use (optional)
 
     Returns:
         Tuple containing the match score and optional analysis description
     """
     try:
+        request_data = {
+            "vacancy_description": vacancy_text,
+            "candidate_description": candidate_text,
+            "predictor_type": predictor_type,
+        }
+
+        # Add predictor parameters if a specific model is selected
+        if model:
+            request_data["predictor_parameters"] = {"model": model}
+
         response = requests.post(
             f"{API_URL}/match",
-            json={
-                "vacancy_description": vacancy_text,
-                "candidate_description": candidate_text,
-                "predictor_type": predictor_type,
-            },
-            timeout=60,  # Add timeout to prevent hanging
+            json=request_data,
+            timeout=60,
         )
 
         if response.status_code == HTTPStatus.OK:
@@ -135,7 +177,7 @@ def display_results(score: float, description: Optional[str]) -> None:
 
 def input_form() -> None:
     """Handle the input form and matching logic."""
-    predictor_type = get_predictor_selection()
+    predictor_type, selected_model = get_predictor_selection()
 
     with st.form("matching_form"):
         col1, col2 = st.columns(2)
@@ -187,7 +229,7 @@ def input_form() -> None:
 
             with st.spinner("Calculating match..."):
                 score, description = get_match_score(
-                    vacancy_text, candidate_text, predictor_type
+                    vacancy_text, candidate_text, predictor_type, selected_model
                 )
                 display_results(score, description)
 
