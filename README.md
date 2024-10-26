@@ -20,6 +20,7 @@ A system for matching job candidates with vacancies using AI-powered analysis. T
 │       ├── prompts/
 │       └── ...
 ├── notebooks/           # Jupyter notebooks
+├── misc/               # Demo and example files
 ├── poetry.lock
 ├── pyproject.toml
 ├── requirements.txt
@@ -49,6 +50,12 @@ This project uses Poetry for dependency management. Follow these steps to set up
    ```
 
 ## Running the Application
+
+### Demo
+
+![Demo](misc/demo-lunapark.gif)
+
+Watch the demo above to see the CV-Vacancy Matcher in action.
 
 ### Backend Service
 
