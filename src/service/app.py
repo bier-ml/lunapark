@@ -35,13 +35,13 @@ def get_predictor(
         return DummyPredictor()
     elif predictor_type == "lm":
         return LMPredictor(
-            api_base_url=parameters.api_base_url
+            api_base_url=parameters.api_base_url  # type: ignore
             if parameters
             else os.getenv("LM_API_BASE_URL", "http://localhost:1234/v1"),
-            api_key=parameters.api_key
+            api_key=parameters.api_key  # type: ignore
             if parameters
             else os.getenv("LM_API_KEY", "not-needed"),
-            model=parameters.model
+            model=parameters.model  # type: ignore
             if parameters
             else os.getenv("LM_MODEL", "QuantFactory/Meta-Llama-3-8B-GGUF"),
         )
@@ -91,7 +91,7 @@ async def get_available_models() -> AvailableModelsResponse:
 async def get_available_models_per_predictor() -> AvailableModelsPerPredictorResponse:
     """Get available models for each predictor type."""
     models_dict = {
-        PredictorType(predictor_type): predictor_class.get_available_models()
+        PredictorType(predictor_type): predictor_class.get_available_models()  # type: ignore
         for predictor_type, predictor_class in PREDICTOR_CLASSES.items()
     }
     return AvailableModelsPerPredictorResponse(models=models_dict)
