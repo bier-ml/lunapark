@@ -133,7 +133,7 @@ def get_match_score(
 
         # Add predictor parameters if a specific model is selected
         if model:
-            request_data["predictor_parameters"] = {"model": model}
+            request_data["predictor_parameters"] = {"model": model}  # type: ignore
 
         response = requests.post(
             f"{API_URL}/match",

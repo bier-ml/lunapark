@@ -40,3 +40,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 web = "src.app.streamlit_app:run_script"
+
+[tool.mypy]
+ignore_missing_imports = true
