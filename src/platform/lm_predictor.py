@@ -133,22 +133,8 @@ class LMPredictor(BasePredictor):
         except Exception as e:
             return 0.0, f"Error in prediction: {str(e)}"
 
-    def batch_predict(
-        self, input_data_list: list[Dict[str, Any]]
-    ) -> list[Dict[str, Any]]:
-        """
-        Make predictions for multiple inputs.
-
-        Args:
-            input_data_list: List of input data dictionaries
-
-        Returns:
-            List of prediction results
-        """
-        return [self.predict(input_data) for input_data in input_data_list]
-
     @classmethod
-    def get_available_models(cls) -> Tuple[str]:
+    def get_available_models(cls) -> Tuple[str, ...]:
         return (
             "QuantFactory/Meta-Llama-3-8B-GGUF",
             "mistralai/Mistral-7B-v0.1",

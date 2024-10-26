@@ -16,7 +16,7 @@ from app import app
 client = TestClient(app)
 
 
-def test_prediction_endpoint() -> NoReturn:
+def test_prediction_endpoint() -> None:
     """
     Test the prediction endpoint of the matching API.
 
