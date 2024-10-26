@@ -78,7 +78,7 @@ async def calculate_match(request: MatchRequest) -> MatchResponse:
 )
 async def get_available_models() -> AvailableModelsResponse:
     """Get list of available predictor types."""
-    available_types = [PredictorType(key) for key in ["dummy", "lm"]]
+    available_types = [PredictorType(key) for key in PREDICTOR_CLASSES.keys()]
     return AvailableModelsResponse(predictor_types=available_types)
 
 
