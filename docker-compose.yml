@@ -8,6 +8,8 @@ services:
       - 8501:8501
     depends_on:
       - backend
+    environment:
+      - API_URL=http://backend:8000
     volumes:
       - ./:/app
     restart: always
@@ -21,6 +23,8 @@ services:
       dockerfile: Dockerfile.fastapi
     ports:
       - 8000:8000
+    environment:
+      - LM_API_BASE_URL=http://host.docker.internal:1234/v1
     volumes:
       - ./:/app
     restart: always
