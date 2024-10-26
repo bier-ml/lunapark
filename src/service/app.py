@@ -17,7 +17,7 @@ app = FastAPI(
 predictors = {
     "dummy": DummyPredictor(),
     "lm": LMPredictor(
-        api_base_url=os.getenv("LM_API_BASE_URL", "http://localhost:1234/v1"),
+        api_base_url=os.getenv("LM_API_BASE_URL", "http://host.docker.internal:1234/v1"),
         api_key=os.getenv("LM_API_KEY", "not-needed"),
         model=os.getenv("LM_MODEL", "xtuner/llava-llama-3-8b-v1_1-gguf"),
     ),
