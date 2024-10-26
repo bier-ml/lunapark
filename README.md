@@ -1,21 +1,30 @@
-# Project Name
+# CV-Vacancy Matcher
 
-This repository contains a FastAPI backend service and a Streamlit frontend application.
+A system for matching job candidates with vacancies using AI-powered analysis. The project consists of a FastAPI backend service and a Streamlit frontend application.
 
 ## Repository Structure
 
 ```
 .
-├── app/                    # Streamlit frontend application
-│   ├── streamlit_app.py   # Main Streamlit interface
-│   ├── models.py          # Shared data models
-│   ├── app.py            # Frontend application logic
-│   └── test_api.py       # Frontend tests
-├── service/              # Backend service
-│   └── test_api.py      # Backend API tests
-├── poetry.lock          # Poetry dependency lock file
-├── pyproject.toml       # Project configuration and dependencies
-└── requirements-service.txt  # Service-specific requirements
+├── src/
+│   ├── app/              # Streamlit frontend application
+│   │   ├── streamlit_app.py
+│   │   └── __init__.py
+│   ├── service/          # Backend service
+│   │   ├── app.py
+│   │   ├── models.py
+│   │   ├── test_api.py
+│   │   └── __init__.py
+│   └── platform/         # Core platform functionality
+│       ├── lm_predictor.py
+│       ├── prompts/
+│       └── ...
+├── notebooks/           # Jupyter notebooks
+├── poetry.lock
+├── pyproject.toml
+├── requirements.txt
+├── Dockerfile.fastapi
+└── Dockerfile.streamlit
 ```
 
 ## Setup
