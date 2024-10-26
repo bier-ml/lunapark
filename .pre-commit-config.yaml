@@ -7,10 +7,10 @@ repos:
         entry: poetry run ruff format .
         pass_filenames: false # run once per commit rather than file
         language: system
-    -   id: isort
-        name: isort
+    -   id: sort-imports
+        name: sort-imports
         description: Keep imports in a nice sorted order
-        entry: poetry run isort .
+        entry: ruff check --select I --fix
         pass_filenames: false
         language: system
     # -   id: mypy
