@@ -10,6 +10,7 @@ from typing import Dict, NoReturn
 
 import requests
 from fastapi.testclient import TestClient
+
 from app import app
 
 client = TestClient(app)
@@ -36,7 +37,7 @@ def test_prediction_endpoint() -> NoReturn:
     test_data: Dict[str, str] = {
         "vacancy_description": "3+ years Python experience required, Bachelor's degree in Computer Science, ML and FastAPI knowledge required",
         "candidate_description": "5 years of Python experience, Masters in Computer Science, Machine Learning and FastAPI expertise",
-        "predictor_type": "dummy"
+        "predictor_type": "dummy",
     }
 
     try:
@@ -64,7 +65,7 @@ def test_calculate_match():
         json={
             "vacancy_description": "Python developer with 3+ years of experience",
             "candidate_description": "5 years of Python development experience",
-            "predictor_type": "dummy"
+            "predictor_type": "dummy",
         },
     )
     assert response.status_code == 200
@@ -82,7 +83,7 @@ def test_invalid_predictor():
         json={
             "vacancy_description": "Python developer",
             "candidate_description": "Python experience",
-            "predictor_type": "invalid_predictor"
+            "predictor_type": "invalid_predictor",
         },
     )
     assert response.status_code == 400
