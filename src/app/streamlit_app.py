@@ -16,7 +16,7 @@ import streamlit as st
 
 # Configuration
 API_URL = os.getenv(
-    "API_URL", "http://localhost:8000"
+    "API_URL", "http://backend:8000"
 )  # Changed default from localhost to fastapi
 
 
