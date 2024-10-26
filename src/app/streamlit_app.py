@@ -7,6 +7,7 @@ to input vacancy and candidate descriptions and get a matching score along
 with detailed analysis.
 """
 
+import os
 from http import HTTPStatus
 from typing import Optional, Tuple
 
@@ -14,7 +15,9 @@ import requests
 import streamlit as st
 
 # Configuration
-API_URL = "http://localhost:8000"
+API_URL = os.getenv(
+    "API_URL", "http://localhost:8000"
+)  # Changed default from localhost to fastapi
 
 
 def set_page_config() -> None:

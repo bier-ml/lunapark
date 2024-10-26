@@ -25,10 +25,10 @@ repos:
         entry: poetry check
         pass_filenames: false
         language: system
-    - id: poetry-export-service
-      name: poetry-export
-      description: Exports requirements-service.txt file for docker container
-      entry: poetry export
-      args: [ "--with", "service", "-o", "requirements-service.txt" ]
-      pass_filenames: false
-      language: system
+    -   id: poetry-export-service
+        name: poetry-export
+        description: Exports requirements.txt file for docker container with service and web dependencies
+        entry: poetry export
+        args: [ "--with", "service,web", "-o", "requirements.txt" ]
+        pass_filenames: false
+        language: system
