@@ -19,7 +19,7 @@ class PredictorType(str, Enum):
 
 class PredictorParameters(BaseModel):
     api_base_url: Optional[str] = Field(
-        default=None, description="Base URL for the language model API"
+        default="http://localhost:1234/v1", description="Base URL for the language model API"
     )
     api_key: Optional[str] = Field(
         default=None, description="API key for the language model service"
