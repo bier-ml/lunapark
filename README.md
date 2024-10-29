@@ -61,7 +61,7 @@ Watch the demo above to see the CV-Vacancy Matcher in action.
 
 1. Start the FastAPI backend server:
    ```bash
-   poetry run uvicorn service.api:app --reload
+   poetry run uvicorn src.service.app:app --reload
    ```
 
    The API will be available at `http://localhost:8000`
@@ -71,7 +71,7 @@ Watch the demo above to see the CV-Vacancy Matcher in action.
 1. Make sure the backend service is running
 2. In a new terminal, start the Streamlit app:
    ```bash
-   poetry run streamlit run app/streamlit_app.py
+   poetry run streamlit run src/app/streamlit_app.py
    ```
 
    The Streamlit interface will be available at `http://localhost:8501`
