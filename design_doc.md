@@ -160,25 +160,67 @@ The solution’s quality and success will be measured by metrics that correspond
 
 ### 2.3 Solution Architecture Diagram
 
-The solution is designed to operate as a microservices-based system, facilitating integration with HR Luna Park’s existing databases and ensuring scalability. The architecture consists of components for frontend interaction, backend processing, ML model inference, and data storage.
+The solution is designed as a modular system with clear separation between frontend, backend API, and AI platform components. The architecture prioritizes local model deployment for data privacy and supports integration with HR Luna Park's existing systems.
 
 ```mermaid
 graph TD
-    A[Frontend] --> B[Backend]
+    A[Frontend - Streamlit] --> B[Backend API - FastAPI]
     B --> C[AI Platform]
-    C --> D[Model Server]
-    B --> E[Database]
+    C --> D[Local LLM Server]
+    B --> E[(Airflow Database)]
     D --> F[Model Storage]
-    F --> G[Embedding Models - BERT]
+    F --> G1[Local LLM Model 1]
+    F --> G2[Local LLM Model 2]
+    F --> G3[Local LLM Model N]
+    
+    %% Fine-tuning flow
+    H[(Training Data)] --> I[Fine-tuning Pipeline]
+    I --> J[Fine-tuned Model]
+    J --> F
+    
+    %% Style for multiple models
+    style G1 fill:#f9f,stroke:#333
+    style G2 fill:#f9f,stroke:#333
+    style G3 fill:#f9f,stroke:#333
+    style J fill:#f96,stroke:#333
 ```
 
 This architecture supports:
 
--   **Frontend**: The recruiter-facing interface (e.g., Streamlit), allowing resume uploads, job description inputs, and viewing ranked candidates.
--   **Backend**: FastAPI serves as the core API layer, interfacing with ML models and handling data processing tasks.
--   **AI Platform and Model Server**: Hosts ML models for resume-job matching and success prediction, i.e. managed by the vLLM model server.
--   **Embedding Models**: Models like BERT or DistilBERT are used to create semantic embeddings for text-based matching.
--   **Database**: A database stores resumes, job descriptions, model outcomes, and feedback data for ongoing model retraining and performance monitoring.
+- **Frontend**: A Streamlit-based user interface that provides an intuitive way for recruiters to:
+  - Upload and process resumes
+  - Input job descriptions
+  - View candidate rankings and match scores
+  - Access detailed match explanations
+
+- **Backend API**: FastAPI-powered service that:
+  - Handles request validation using Pydantic models
+  - Manages communication with the AI platform
+  - Provides documented OpenAPI/Swagger endpoints
+  - Implements predictor type abstraction (dummy/LM)
+
+- **AI Platform**: 
+  - Manages local LLM deployment for privacy-compliant processing
+  - Supports multiple predictor types through a common interface
+  - Implements prompt engineering for accurate candidate evaluation
+  - Uses locally hosted open-source models (e.g., Mistral, Llama)
+
+- **Model Storage**: 
+  - Houses multiple locally deployed LLM models
+  - Supports various model options (Mistral-7B, Llama-2, etc.)
+  - Enables easy model switching and version management
+  - Stores fine-tuned models optimized for recruitment tasks
+
+- **Fine-tuning Pipeline**:
+  - Processes training data from historical matches
+  - Fine-tunes base models for recruitment-specific tasks
+  - Validates model performance before deployment
+  - Enables continuous model improvement
+
+- **Database**: 
+  - Dedicated Airflow tables for workflow management
+  - Tracks model predictions and system metrics
+  - Stores feedback for future model improvements
 
 ### 2.4 Solution Implementation Stages
 
@@ -193,17 +235,6 @@ The solution is developed in multiple stages, each focusing on data preparation,
 2. **Feature Engineering**:
 
     - **Objective**: Transform raw text data into meaningful features for ML models, incorporating both traditional and LLM approaches.
-    - **Code Example**:
-        ```python
-        def process_resume(text):
-            # Remove PII
-            text = remove_personal_info(text)
-            # Extract key sections
-            sections = extract_sections(text)
-            # Generate embeddings
-            embeddings = bert_model.encode(text)
-            return create_feature_vector(sections, embeddings)
-        ```
     - **Tasks**:
         - Extract key skills and experiences from resumes using traditional methods.
         - Embed job descriptions and resumes for semantic similarity comparison using both traditional models (e.g., BERT) and LLMs.
