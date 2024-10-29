@@ -2,67 +2,124 @@
 
 ## Table of Contents
 
-1. Business Task Definition
-    1. Business Problem Statement
-    2. Success Criteria
-    3. Business Requirements
-    4. Typical Use Cases
-2. Technical Task Definition
-    1. Technical Problem Formulation
-    2. Quality Metrics and Success Criteria
-    3. Solution Architecture Diagram
-    4. Solution Implementation Stages
-    5. Data Description
-3. Project Productionization
-    1. Technical Architecture Diagram
-    2. Infrastructure Description
-    3. Technical Requirements
-4. Quality Characteristics
-    1. System Scalability
-    2. Performance Requirements
-    3. System Reliability
-    4. Model Retraining / Automated Model Replacement
-    5. Load Testing Results
-    6. Future System Extensions
+1. [Business Task Definition](#1-business-task-definition)
+   1. [Business Problem Statement](#11-business-problem-statement)
+   2. [Success Criteria](#12-success-criteria)
+   3. [Business Requirements](#13-business-requirements)
+   4. [Typical Use Cases](#14-typical-use-cases)
+2. [Technical Task Definition](#2-technical-task-definition)
+   1. [Technical Problem Formulation](#21-technical-problem-formulation)
+   2. [Quality Metrics and Success Criteria](#22-quality-metrics-and-success-criteria)
+   3. [Solution Architecture Diagram](#23-solution-architecture-diagram)
+   4. [Solution Implementation Stages](#24-solution-implementation-stages)
+   5. [Data Description](#25-data-description)
+3. [Project Productionization](#3-project-productionization)
+   1. [Technical Architecture Diagram](#31-technical-architecture-diagram)
+   2. [Infrastructure Description](#32-infrastructure-description)
+   3. [Technical Requirements](#33-technical-requirements)
+4. [Quality Characteristics](#4-quality-characteristics)
+   1. [System Scalability](#41-system-scalability)
+   2. [Performance Requirements](#42-performance-requirements)
+   3. [System Reliability](#43-system-reliability)
+   4. [Model Retraining / Automated Model Replacement](#44-model-retraining--automated-model-replacement)
+   5. [Load Testing Results](#45-load-testing-results)
+   6. [Future System Extensions](#46-future-system-extensions)
 
 ## 1. Business Task Definition
 
 ### 1.1 Business Problem Statement
 
-HR Luna Park seeks to enhance its recruitment process by automating the initial resume screening phase. The current manual process is time-consuming, inconsistent, and heavily reliant on individual recruiters' expertise.
+HR Luna Park seeks to enhance its recruitment process by automating the initial resume screening phase. The current manual process is time-consuming, inconsistent, and heavily reliant on individual recruiters' expertise. 
+
+Each candidate's application must pass through multiple stakeholders – first the recruiter for initial screening, then various technical experts who need to evaluate specific skills for different vacancies. This multi-stage manual review creates significant bottlenecks, as technical experts must balance their primary roles with timely candidate evaluations. 
+
+The process becomes particularly challenging when managing multiple open positions simultaneously, as experts need to accurately rank candidates across different vacancies while maintaining quick turnaround times. This leads to delays in the hiring process and risks losing top talent to competitors who can move faster.
+
+The current pipeline's manual nature makes it fundamentally unscalable as the company grows. With HR Luna Park's expansion plans, the volume of applications is expected to increase, making it impossible to maintain quality and speed with the existing process. Technical experts are already at capacity, and hiring additional experts solely for resume screening is not cost-effective. The AI-powered system is therefore crucial not just for optimization, but as an enabler for the company's growth strategy - allowing the screening process to scale linearly with application volume while maintaining consistent quality and quick turnaround times.
 
 ### 1.2 Success Criteria
 
--   Reduce resume screening time by 75%
--   Achieve 90% agreement rate with expert recruiters
--   Reduce hiring cycle time by 50%
--   Increase recruiter productivity by 60%
+- Reduce resume screening time.
+- Achieve the particular agreement rate with expert recruiters in identifying unsuitable candidates (crucial for reducing expert workload).
+- Achieve the particular agreement rate with expert recruiters for candidate ranking.
+- Increase daily candidate processing capacity per recruiter by 100% (from average `20` to `40` candidates per day).
 
 ### 1.3 Business Requirements
 
 1. Automated Resume Processing
-
-    - Parse multiple document formats (PDF, DOCX)
-    - Extract relevant information automatically
-    - Handle multilingual resumes
+   - Parse multiple document formats (PDF, DOCX, *LinkedIn profile*).
+   - Extract relevant information about the candidate automatically.
+   - Handle multilingual resumes (English, Russian, Ukranian).
 
 2. Intelligent Matching
-    - Match candidates to job requirements
-    - Score candidates based on skills and experience
-    - Provide explainable results
+   - Match candidates to job requirements.
+   - Score candidates based on skills and experience needed for the particular vacancy.
+   - Provide explainable results in natural language.
+   - Process all data using locally deployed open-source models only, as sending candidate PII to third-party LLM services (like OpenAI) is prohibited for data privacy reasons.
 
 ### 1.4 Typical Use Cases
 
-1. **Basic Resume Screening**
+1. **Individual Candidate Assessment**
+   - Input: 
+     - Candidate information (LinkedIn profile URL, resume PDF, or text description)
+     - Target position requirements
+   - Process: 
+     - Automatic parsing and analysis
+     - Skill matching and experience evaluation
+   - Output:
+     - Numerical score (0-100)
+     - Detailed natural language explanation of the score
+     - Specific strengths and potential gaps relative to the position
 
-    - Input: New resume submission
-    - Process: Automatic parsing and scoring
-    - Output: Match score and recommendations
+2. **Automated Batch Analysis**
+   - Input:
+     - Collection of candidate profiles accumulated over time
+     - Position requirements
+   - Process:
+     - Batch processing and comparative analysis
+     - Statistical evaluation across all candidates
+   - Output:
+     - Ranked list of candidates
+     - Individual scores and explanations
+     - Aggregate statistics and trends
+     - Summary of top candidates with comparative strengths
 
-2. **Bulk Processing**
-    - Input: Multiple resumes for one position
-    - Process: Batch processing and ranking
-    - Output: Ranked list of candidates
+3. **API Integration**
+   - Description:
+     - RESTful API endpoints for external system integration
+     - Comprehensive API documentation with OpenAPI/Swagger
+     - Authentication using API keys or OAuth2
+    
+   - Example Endpoints:
+     <details>
+       <summary>Click to expand</summary>
+
+       ```json
+       POST /api/v1/match
+       {
+         "vacancy_description": "We are looking for a Senior Backend Developer with 5+ years of experience in Python, FastAPI, and PostgreSQL. The role is remote-friendly and requires strong system design skills.",
+         "candidate_description": "Senior software engineer with 7 years of experience in web development. Expert in Python, having built multiple production services using FastAPI. Familiar with PostgreSQL through side projects. Contributed to open-source projects and mentored junior developers.",
+         "predictor_type": "lm",
+         "predictor_parameters": {
+           "api_base_url": "http://localhost:1234/v1",
+           "model": "mistral-7b-instruct"
+         }
+       }
+       ```
+
+     </details>
+   - Example Response:
+     <details>
+       <summary>Click to expand</summary>
+
+     ```json
+     {
+       "score": 85.5,
+       "description": "Strong match for the Senior Backend Developer position. Key strengths: 7 years of Python development experience and extensive FastAPI usage in production. Areas for consideration: PostgreSQL experience is limited to side projects rather than production systems. Overall, the candidate's technical expertise and experience level align well with the core requirements."
+     }
+     ```
+     </details>
+
 
 ### 2. Technical Task Definition
 
