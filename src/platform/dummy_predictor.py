@@ -20,6 +20,9 @@ class DummyPredictor(BasePredictor):
         Returns:
             Tuple[float, str]: Random score between 0.1 and 0.9 and a basic description
         """
+
+        _, _ = candidate_description, vacancy_description
+
         # Generate random score between 0.1 and 0.9
         score = round(random.uniform(0.1, 0.9), 2)
 
