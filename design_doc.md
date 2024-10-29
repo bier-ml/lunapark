@@ -164,7 +164,12 @@ The solution is designed as a modular system with clear separation between front
 
 ```mermaid
 graph TD
-    A[Frontend - Streamlit] --> B[Backend API - FastAPI]
+    %% User interactions
+    U((User)) --> A[Frontend - Streamlit]
+    U --> B[Backend API - FastAPI]
+    
+    %% Main flow
+    A --> B
     B --> C[AI Platform]
     C --> D[Local LLM Server]
     B --> E[(Airflow Database)]
@@ -183,6 +188,7 @@ graph TD
     style G2 fill:#f9f,stroke:#333
     style G3 fill:#f9f,stroke:#333
     style J fill:#f96,stroke:#333
+    style U fill:#85C1E9,stroke:#333
 ```
 
 This architecture supports:
