@@ -37,7 +37,9 @@ def get_predictor(
         return LMPredictor(
             api_base_url=parameters.api_base_url  # type: ignore
             if parameters
-            else os.getenv("LM_API_BASE_URL", "http://localhost:1234/v1"),
+            else os.getenv(
+                "LM_API_BASE_URL", "http://localhost:1234/v1"
+            ),  # base host for LMStudio
             api_key=parameters.api_key  # type: ignore
             if parameters
             else os.getenv("LM_API_KEY", "not-needed"),
