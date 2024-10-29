@@ -284,37 +284,146 @@ An initial EDA was conducted to assess data completeness, identify missing value
 
 ```mermaid
 graph TD
-    A[Load Balancer] --> B[API Cluster]
-    B --> C[Model Inference]
-    C --> D[GPU Pool]
-    B --> E[Database Cluster]
+    %% External Access Layer
+    User((User)) --> LB[External Load Balancer]
+    LB --> ING[Nginx Ingress Controller]
+    
+    %% Kubernetes Cluster
+    subgraph "Kubernetes Cluster"
+        %% Frontend Service
+        subgraph "Frontend Namespace"
+            FRS[Frontend Service]
+            FRP1[Frontend Pod 1]
+            FRP2[Frontend Pod 2]
+            FRP3[Frontend Pod N]
+            FRS --> FRP1
+            FRS --> FRP2
+            FRS --> FRP3
+        end
+        
+        %% Backend Service
+        subgraph "Backend Namespace"
+            BES[Backend Service]
+            BEP1[Backend Pod 1]
+            BEP2[Backend Pod 2]
+            BEP3[Backend Pod N]
+            BES --> BEP1
+            BES --> BEP2
+            BES --> BEP3
+        end
+        
+        %% ML Service
+        subgraph "ML Namespace"
+            subgraph "Primary Scoring Service"
+                MLS1[CatBoost Service]
+                MSP1[CatBoost Pod 1]
+                MSP2[CatBoost Pod 2]
+                MLS1 --> MSP1
+                MLS1 --> MSP2
+            end
+            
+            subgraph "LLM Service"
+                MLS2[LLM Service]
+                LMP1[LLM Pod 1]
+                LMP2[LLM Pod 2]
+                MLS2 --> LMP1
+                MLS2 --> LMP2
+            end
+        end
+        
+        %% Databases
+        subgraph "Model Storage"
+            MinIO[MinIO Object Storage]
+        end
+        
+        %% Monitoring Stack
+        subgraph "Monitoring Namespace"
+            PROM[Prometheus]
+            GRAF[Grafana]
+            ALERT[AlertManager]
+            ELK[ELK Stack]
+            PROM --> GRAF
+            PROM --> ALERT
+        end
+    end
+    
+    %% External Services
+    subgraph "External Services"
+        S3[AWS S3 Backup]
+        GPU[GPU Node Pool]
+    end
+    
+    %% Connections
+    ING --> FRS
+    ING --> BES
+    BES --> MLS1
+    MLS1 -->|Score > 0.5| MLS2
+%%    BES --> PGM
+    MLS1 --> MinIO
+    MLS2 --> MinIO
+    MLS2 --> GPU
+%%    PGM --> S3
+    
+    %% Monitoring Connections
+    PROM -.-> FRS
+    PROM -.-> BES
+    PROM -.-> MLS1
+    PROM -.-> MLS2
+    ELK -.-> FRS
+    ELK -.-> BES
+    ELK -.-> MLS1
+    ELK -.-> MLS2
+    
+    %% Styling
+    classDef service fill:#85C1E9,stroke:#333
+    classDef pod fill:#82E0AA,stroke:#333
+    classDef db fill:#F8C471,stroke:#333
+    classDef monitoring fill:#C39BD3,stroke:#333
+    
+    class FRS,BES,MLS1,MLS2 service
+    class FRP1,FRP2,FRP3,BEP1,BEP2,BEP3,MSP1,MSP2,LMP1,LMP2 pod
+    class MinIO db
+    class PROM,GRAF,ALERT,ELK monitoring
 ```
 
 ### 3.2 Infrastructure Description
+**Development Environment**
 
-1. **Compute Resources**
+- Local development using Docker Desktop
+- Individual service containers can be run separately
+- Hot-reloading enabled for frontend and backend development
+- GPU support for ML service container (optional)
 
-    - API Servers: 4x t2.large
-    - Model Servers: 2x g4dn.xlarge
-    - Database: RDS r5.large
+**Staging Environment**
 
-2. **Storage Requirements**
-    - Model Artifacts: 100GB
-    - Document Storage: 500GB/year
-    - Database: 1TB with replication
+- Kubernetes cluster with 3 nodes
+- Automated CI/CD pipeline using GitHub Actions
+
+**Production Environment**
+
+- Kubernetes cluster with minimum 5 nodes
+- High-availability configuration
+- Automated scaling based on load
+- Regular database backups
+- Load balancing using Nginx Ingress Controller
+
 
 ### 3.3 Technical Requirements
+#### Minimal Requirements (Development)
 
-1. **Performance**
+| Component | CPU     | RAM | Storage | Network |
+|-----------|---------|-----|--------|---------|
+| Frontend | 2 cores | 2GB | 1GB | 100Mbps |
+| Backend | 2 cores | 4GB | 2GB | 100Mbps |
+| ML Service | 4 cores | 16GB | 50GB | 100Mbps |
 
-    - Latency: < 2s per request
-    - Throughput: 100 requests/second
-    - Concurrent Users: 50
+#### Production Requirements (High Load)
 
-2. **Security**
-    - Data Encryption at rest
-    - HTTPS/TLS
-    - Role-based access control
+| Component | CPU | RAM | Storage       | Network |
+|-----------|-----|-----|---------------|---------|
+| Frontend | 2 cores × 3 pods | 4GB per pod | 20GB per pod  | 1Gbps |
+| Backend | 4 cores × 5 pods | 8GB per pod | 20GB per pod  | 1Gbps |
+| ML Service | 8 cores × 3 pods | 32GB per pod | 100GB per pod | 1Gbps |
 
 ## 4. Quality Characteristics
 
