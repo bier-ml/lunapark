@@ -2,6 +2,10 @@
 
 A system for matching job candidates with vacancies using AI-powered analysis. The project consists of a FastAPI backend service and a Streamlit frontend application.
 
+## Design Documentation
+
+For detailed information about the system architecture, components, and technical decisions, please refer to our [Design Document](design_doc.md). This document outlines the core system design, architecture decisions, and implementation details for developers and technical stakeholders.
+
 ## Repository Structure
 
 ```
