@@ -282,6 +282,7 @@ An initial EDA was conducted to assess data completeness, identify missing value
 
 ### 3.1 Technical Architecture Diagram
 
+All services are containerized using Docker with specific optimizations for ML workloads. The ML service operates within its own dedicated Kubernetes namespace and consists of two primary containerized services optimized for different stages of the prediction pipeline.
 ```mermaid
 graph TD
     %% External Access Layer
