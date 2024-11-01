@@ -430,38 +430,39 @@ graph TD
 
 ### 4.1 System Scalability
 
--   Horizontal scaling of API servers
--   Auto-scaling based on load
--   Database read replicas
--   Distributed model inference
+- **Horizontal Scaling**: The system is designed to scale horizontally, allowing additional instances of the frontend and backend services to be deployed as demand increases. This ensures that the system can handle a growing number of users and requests without degradation in performance.
+- **Auto-scaling**: Kubernetes will automatically scale the number of pods for the frontend and backend services based on CPU and memory usage, ensuring optimal resource utilization and responsiveness during peak loads.
+- **Database Read Replicas**: To enhance read performance, the system will implement read replicas for the database, allowing multiple instances to handle read requests concurrently, thus reducing latency.
+- **Distributed Model Inference**: The ML service will support distributed inference, enabling multiple instances of the model to process requests in parallel, which is crucial for handling large volumes of candidate evaluations efficiently.
 
 ### 4.2 Performance Requirements
 
 | Component       | Metric           | Target       |
 | --------------- | ---------------- | ------------ |
-| API Response    | P95 Latency      | < 2s         |
-| Model Inference | Batch Processing | 50 resumes/s |
-| Database        | Query Response   | < 100ms      |
+| **API Response**    | P95 Latency      | < 2s         |
+| **Model Inference** | Batch Processing | 50 resumes/s |
+| **Database**        | Query Response   | < 100ms      |
+| **Frontend Load Time** | Initial Load Time | < 3s      |
+| **Backend Throughput** | Requests per Second | ≥ 1000   |
 
 ### 4.3 System Reliability
 
--   High Availability: 99.9% uptime
--   Automated failover
--   Regular backups
--   Error monitoring and alerting
+- **High Availability**: The system is designed to achieve 99.9% uptime, ensuring that services are consistently available to users.
+- **Automated Failover**: In the event of a service failure, automated failover mechanisms will redirect traffic to healthy instances, minimizing downtime.
+- **Regular Backups**: The system will implement a robust backup strategy, including regular snapshots of the database and model storage, to prevent data loss and facilitate recovery in case of failures.
+- **Error Monitoring and Alerting**: Continuous monitoring of system performance and error rates will be implemented using tools like Prometheus and Grafana, with alerts configured to notify the development team of any critical issues.
 
 ### 4.4 Model Retraining / Automated Model Replacement
 
-1. **Monitoring Triggers**
+1. **Monitoring Triggers**:
+    - **Performance Degradation**: The system will monitor model performance metrics, such as accuracy and response time, to detect any degradation over time.
+    - **Data Drift Detection**: Continuous analysis of incoming data will be performed to identify shifts in data distribution that may affect model performance.
+    - **Weekly Evaluation Cycles**: Regular evaluations of model performance will be scheduled to ensure that the model remains effective and relevant.
 
-    - Performance degradation
-    - Data drift detection
-    - Weekly evaluation cycles
-
-2. **Retraining Pipeline**
-    - Automated data collection
-    - A/B testing framework
-    - Shadow deployment
+2. **Retraining Pipeline**:
+    - **Automated Data Collection**: The system will automatically collect new data from candidate evaluations and feedback to be used for retraining.
+    - **A/B Testing Framework**: An A/B testing framework will be implemented to compare the performance of the current model against newly trained models before full deployment.
+    - **Shadow Deployment**: New models will be deployed in a shadow mode, where they process requests alongside the current model without affecting user experience, allowing for performance comparison.
 
 ### 4.5 Load Testing Results
 
@@ -471,16 +472,16 @@ graph TD
 | 50               | 300                | 0.1            |
 | 100              | 600                | 0.5            |
 | 500              | 1200               | 2.0            |
+| 1000             | 2000               | 5.0            |
 
 ### 4.6 Future System Extensions
 
-1. **Enhanced Features**
+1. **Enhanced Features**:
+    - **Multi-language Support**: Future iterations of the system will include support for additional languages, expanding the candidate pool and improving accessibility.
+    - **Video Interview Integration**: The system will integrate video interview capabilities, allowing for a more comprehensive assessment of candidates.
+    - **Automated Reference Checking**: Future enhancements will include automated processes for checking candidate references, streamlining the hiring process.
 
-    - Multi-language support
-    - Video interview integration
-    - Automated reference checking
-
-2. **Technical Improvements**
-    - Real-time processing
-    - Advanced analytics dashboard
-    - Integration with additional HR systems
+2. **Technical Improvements**:
+    - **Real-time Processing**: The system will evolve to support real-time processing of candidate data, enabling immediate feedback and assessments.
+    - **Advanced Analytics Dashboard**: An analytics dashboard will be developed to provide insights into hiring trends, candidate performance, and system efficiency.
+    - **Integration with Additional HR Systems**: The system will be designed to integrate seamlessly with other HR tools and platforms, enhancing overall recruitment workflows.
