@@ -66,6 +66,7 @@ coverage.xml
 *.log
 *.sqlite
 *.db
+*.csv
 
 # OS generated files
 .DS_Store
