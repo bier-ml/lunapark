@@ -104,11 +104,9 @@ for index, row in df.iterrows():
 
     # Call the summarize_cv function
     summary_response = summarize_cv(row['cv'])
-    print(f"Summary Response: {summary_response}")
 
     # Call the summarize_job_description function
     job_summary_response = summarize_job_description(row['job_description'])
-    print(f"Job Summary Response: {job_summary_response}")
 
     # Prepare the data for the model
     messages = [
