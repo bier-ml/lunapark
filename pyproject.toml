@@ -11,6 +11,7 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.11"
 types-requests = "^2.31.0"
+pypdf = "^5.1.0"
 
 
 [tool.poetry.group.research.dependencies]

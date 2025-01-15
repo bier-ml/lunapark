@@ -1,16 +1,16 @@
-import pandas as pd
-import requests
 import json
 import os
 
+import pandas as pd
+import requests
+
 # Load the CSV file into a DataFrame
-parent_folder = os.path.abspath(os.path.join(
-    os.path.dirname(__file__), "../../../"))
+parent_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
 
 # Construct the path to the data.csv file
 data_path = os.path.join(parent_folder, "data.csv")
 
-df = pd.read_csv(data_path)[['cv', 'job_description']]
+df = pd.read_csv(data_path)[["cv", "job_description"]]
 df.dropna()
 
 # Function to summarize CV
@@ -30,16 +30,15 @@ def summarize_cv(cv_content):
 If any category is missing, please respond with "Not specified" for that category.
 """,
         },
-        {
-            "role": "user",
-            "content": f"<CV> {cv_content} </CV>"
-        },
+        {"role": "user", "content": f"<CV> {cv_content} </CV>"},
     ]
 
     # Send the data to the model
-    response = requests.post('http://localhost:5001/v1/chat/completions',
-                             json={"messages": messages})
-    return extract_message(response, ['choices', 0, 'message', 'content'])
+    response = requests.post(
+        "http://localhost:5001/v1/chat/completions", json={"messages": messages}
+    )
+    return extract_message(response, ["choices", 0, "message", "content"])
+
 
 # Function to summarize job description
 
@@ -61,28 +60,30 @@ If any category is missing, please respond with "Not specified" for that categor
         },
         {
             "role": "user",
-            "content": f"<job_description> {job_description_content} </job_description>"
+            "content": f"<job_description> {job_description_content} </job_description>",
         },
     ]
 
     # Send the data to the model
-    response = requests.post('http://localhost:5001/v1/chat/completions',
-                             json={"messages": messages})
-    return extract_message(response, ['choices', 0, 'message', 'content'])
+    response = requests.post(
+        "http://localhost:5001/v1/chat/completions", json={"messages": messages}
+    )
+    return extract_message(response, ["choices", 0, "message", "content"])
+
 
 # Function to extract score from the model's response
 
 
 def extract_score(response):
     try:
-        content = extract_message(
-            response, ['choices', 0, 'message', 'content'])
+        content = extract_message(response, ["choices", 0, "message", "content"])
         score_json = json.loads(content)
-        score = score_json.get('score')
+        score = score_json.get("score")
         return score
     except (ValueError, IndexError, KeyError) as e:
         print(f"Error extracting score: {e}")
         return None
+
 
 # Function to extract a specific message from a structured JSON response
 
@@ -101,12 +102,11 @@ def extract_message(response, key_path):
 
 # Iterate over the DataFrame row by row
 for index, row in df.iterrows():
-
     # Call the summarize_cv function
-    summary_response = summarize_cv(row['cv'])
+    summary_response = summarize_cv(row["cv"])
 
     # Call the summarize_job_description function
-    job_summary_response = summarize_job_description(row['job_description'])
+    job_summary_response = summarize_job_description(row["job_description"])
 
     # Prepare the data for the model
     messages = [
@@ -120,20 +120,21 @@ for index, row in df.iterrows():
         },
         {
             "role": "user",
-            "content": f"<CV> {summary_response} </CV>\n<job_description> {job_summary_response} </job_description>"
+            "content": f"<CV> {summary_response} </CV>\n<job_description> {job_summary_response} </job_description>",
         },
     ]
 
     # Send the data to the model
-    response = requests.post('http://localhost:5001/v1/chat/completions',
-                             json={"messages": messages})
+    response = requests.post(
+        "http://localhost:5001/v1/chat/completions", json={"messages": messages}
+    )
 
     # Extract the score from the final response
     score = extract_score(response)
     print(f"Extracted Score: {score}")
 
     # Save the score back to the DataFrame
-    df.at[index, 'result'] = score
+    df.at[index, "result"] = score
 
 # Save the modified DataFrame
 data_path = os.path.join(parent_folder, "modified_data.csv")
