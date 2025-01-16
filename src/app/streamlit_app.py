@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple
 
 import requests
 import streamlit as st
-from tools import PDFToText  # , LinkedInProfileParser
+from tools import PDFToText  # type: ignore
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 

@@ -11,7 +11,6 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.11"
 types-requests = "^2.31.0"
-pypdf = "^5.1.0"
 
 
 [tool.poetry.group.research.dependencies]
@@ -35,6 +34,7 @@ ipykernel = "^6.29.5"
 
 [tool.poetry.group.web.dependencies]
 streamlit = "^1.39.0"
+pypdf = "^5.1.0"
 
 [build-system]
 requires = ["poetry-core"]

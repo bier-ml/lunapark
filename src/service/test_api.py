@@ -11,7 +11,7 @@ from typing import Dict
 import requests
 from fastapi.testclient import TestClient
 
-from app import app
+from app import app  # type: ignore
 
 client = TestClient(app)
 
