@@ -5,8 +5,9 @@ This module defines the Pydantic models used for request and response validation
 in the candidate-position matching service.
 """
 
+import os
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -19,7 +20,7 @@ class PredictorType(str, Enum):
 
 class PredictorParameters(BaseModel):
     api_base_url: Optional[str] = Field(
-        default="http://localhost:1234/v1",
+        default=os.getenv("LM_API_BASE_URL", "http://localhost:5001/v1"),
         description="Base URL for the language model API",
     )
     api_key: Optional[str] = Field(
@@ -40,6 +41,11 @@ class MatchRequest(BaseModel):
         ...,
         description="The candidate's profile, experience, or resume text",
         min_length=10,
+    )
+    hr_comment: str = Field(
+        ...,
+        description="Any types of comments",
+        min_length=0,
     )
     predictor_type: PredictorType = Field(
         default=PredictorType.DUMMY,

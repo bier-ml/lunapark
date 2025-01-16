@@ -1,5 +1,5 @@
-import json
-from typing import Any, Dict, List, Optional, Tuple
+import os
+from typing import Optional, Tuple
 
 import requests
 
@@ -14,7 +14,7 @@ class LMPredictor(BasePredictor):
 
     def __init__(
         self,
-        api_base_url: str = "http://localhost:1234/v1",  # Default for local LM Studio
+        api_base_url: str = os.getenv("LM_API_BASE_URL", "http://localhost:5001/v1"),
         api_key: str = "not-needed",  # LM Studio, for example, doesn't need real key
         model: str = "local-model",
         temperature: float = 0.7,
@@ -71,20 +71,40 @@ class LMPredictor(BasePredictor):
             "max_tokens": self.max_tokens,
         }
 
+        # Add detailed logging
+        # print(f"Making API call to: {self.api_base_url}/chat/completions")
+        # print(f"Request Headers: {headers}")
+        # print(f"Request Payload: {payload}")
+
         try:
             response = requests.post(
                 f"{self.api_base_url}/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=60,
+                timeout=180,
             )
+
+            # Add response logging
+            # print(f"Response Status Code: {response.status_code}")
+            # print(f"Response Headers: {dict(response.headers)}")
+            # print(f"Response Content: {response.text}")
+
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"]
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
+            # print(f"Request Exception: {str(e)}")
+            if hasattr(e.response, "text"):
+                print(f"Error Response Content: {e.response.text}")
             raise Exception(f"API call failed: {str(e)}")
+        except Exception as e:
+            # print(f"Unexpected error: {str(e, e.response.text)}")
+            raise Exception(f"API call failed: {str(e, e.response.text)}")
 
     def predict(
-        self, candidate_description: str, vacancy_description: str
+        self,
+        candidate_description: str,
+        vacancy_description: str,
+        hr_comment: str,
     ) -> Tuple[float, Optional[str]]:
         """
         Predict match score and generate description for candidate-vacancy pair.
@@ -92,6 +112,7 @@ class LMPredictor(BasePredictor):
         Args:
             candidate_description (str): Description of the candidate's experience and skills
             vacancy_description (str): Description of the job vacancy requirements
+            hr_comment (str): HR comments about candidate's experience
 
         Returns:
             Tuple[float, str]: A tuple containing:
@@ -105,18 +126,19 @@ class LMPredictor(BasePredictor):
             candidate_description=candidate_description,
         )
 
-        print(prompt)
+        print("Generated prompt:", prompt)  # Log the generated prompt
 
         try:
             response = "<thought>\n" + self._call_api(prompt)
+            print("API response received:", response)  # Log the API response
 
-            print(response)
             # Extract the thought/analysis and score from the response
             thought = ""
             score = 0.0
 
             if "</thought>" in response:
                 thought = response.split("<thought>")[1].split("</thought>")[0].strip()
+                print("Extracted thought:", thought)  # Log the extracted thought
 
             if "<score>" in response and "</score>" in response:
                 try:
@@ -125,18 +147,23 @@ class LMPredictor(BasePredictor):
                     )
                     score = float(score_str) / 100.0  # Convert 0-100 score to 0-1
                     score = max(0.0, min(1.0, score))  # Ensure score is between 0 and 1
+                    print("Extracted score:", score)  # Log the extracted score
                 except (ValueError, IndexError):
+                    print("Error parsing score, defaulting to 0.0")  # Log parsing error
                     score = 0.0
 
             return score, thought
 
         except Exception as e:
+            print("Error during prediction:", str(e))  # Log the error
             return 0.0, f"Error in prediction: {str(e)}"
 
-    @classmethod
-    def get_available_models(cls) -> Tuple[str, ...]:
-        return (
-            "QuantFactory/Meta-Llama-3-8B-GGUF",
-            "mistralai/Mistral-7B-v0.1",
-            "meta-llama/Llama-2-7b-chat-hf",
-        )  # Add your actual available models here
+    def get_available_models(self) -> Tuple[str, ...]:
+        try:
+            response = requests.get(
+                f"{self.api_base_url}/models",
+            )
+            response.raise_for_status()
+            return [model["id"] for model in response.json()["data"]]
+        except Exception as e:
+            raise Exception(f"API call failed: {str(e)}")

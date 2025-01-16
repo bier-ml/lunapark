@@ -22,8 +22,8 @@ app = FastAPI(
 )
 
 PREDICTOR_CLASSES = {
-    "dummy": DummyPredictor,
     "lm": LMPredictor,
+    "dummy": DummyPredictor,
 }
 
 
@@ -38,7 +38,7 @@ def get_predictor(
             api_base_url=parameters.api_base_url  # type: ignore
             if parameters
             else os.getenv(
-                "LM_API_BASE_URL", "http://localhost:1234/v1"
+                "LM_API_BASE_URL", "http://localhost:5001/v1"
             ),  # base host for LMStudio
             api_key=parameters.api_key  # type: ignore
             if parameters
@@ -66,7 +66,7 @@ async def calculate_match(request: MatchRequest) -> MatchResponse:
         )
 
     score, description = predictor.predict(
-        request.candidate_description, request.vacancy_description
+        request.candidate_description, request.vacancy_description, request.hr_comment
     )
 
     return MatchResponse(score=score, description=description)
@@ -93,7 +93,7 @@ async def get_available_models() -> AvailableModelsResponse:
 async def get_available_models_per_predictor() -> AvailableModelsPerPredictorResponse:
     """Get available models for each predictor type."""
     models_dict = {
-        PredictorType(predictor_type): predictor_class.get_available_models()  # type: ignore
+        PredictorType(predictor_type): predictor_class().get_available_models()  # type: ignore
         for predictor_type, predictor_class in PREDICTOR_CLASSES.items()
     }
     return AvailableModelsPerPredictorResponse(models=models_dict)

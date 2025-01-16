@@ -34,7 +34,7 @@ def display_header() -> None:
 def get_available_predictors() -> List[str]:
     """Fetch available predictor types from the API."""
     try:
-        response = requests.get(f"{API_URL}/available-models", timeout=10)
+        response = requests.get(f"{API_URL}/available-models", timeout=180)
 
         if response.status_code == HTTPStatus.OK:
             data = response.json()
@@ -54,7 +54,9 @@ def get_available_predictors() -> List[str]:
 def get_available_models_per_predictor() -> dict:
     """Fetch available models for each predictor type from the API."""
     try:
-        response = requests.get(f"{API_URL}/available-models-per-predictor", timeout=10)
+        response = requests.get(
+            f"{API_URL}/available-models-per-predictor", timeout=180
+        )
 
         if response.status_code == HTTPStatus.OK:
             data = response.json()
@@ -63,11 +65,11 @@ def get_available_models_per_predictor() -> dict:
         st.error(
             f"Failed to fetch available models: {response.status_code} - {response.text}"
         )
-        return {}
+        return ["dummy-model-v1"]
 
     except requests.exceptions.RequestException as e:
         st.error(f"Connection Error while fetching models: {str(e)}")
-        return {}
+        return ["dummy-model-v1"]
 
 
 def get_predictor_selection() -> Tuple[str, Optional[str]]:
@@ -105,6 +107,7 @@ def get_predictor_selection() -> Tuple[str, Optional[str]]:
 def get_match_score(
     vacancy_text: str,
     resume_text: str,
+    hr_comment: str,
     predictor_type: str,
     model: Optional[str] = None,
 ) -> Tuple[float, Optional[str]]:
@@ -114,6 +117,7 @@ def get_match_score(
     Args:
         vacancy_text: The job vacancy description
         resume_text: The candidate's description/CV
+        hr_comment: HR comments about candidate
         predictor_type: The type of prediction algorithm to use
         model: The specific model to use (optional)
 
@@ -124,6 +128,7 @@ def get_match_score(
         request_data = {
             "vacancy_description": vacancy_text,
             "candidate_description": resume_text,
+            "hr_comment": hr_comment,
             "predictor_type": predictor_type,
         }
 
@@ -134,7 +139,7 @@ def get_match_score(
         response = requests.post(
             f"{API_URL}/match",
             json=request_data,
-            timeout=60,
+            timeout=180,
         )
 
         if response.status_code == HTTPStatus.OK:
@@ -179,6 +184,7 @@ def input_form() -> None:
     col1, col2 = st.columns(2)
     resume_text = ""
     vacancy_text = ""
+    hr_comment = ""
 
     with col1:
         st.subheader("Candidate")
@@ -193,7 +199,7 @@ def input_form() -> None:
         if candidate_input_method == "Text Input":
             resume_text = st.text_area(
                 "Candidate Description 👤",
-                # height=250,
+                height=200,
                 help="Example:\n"
                 "Experienced software developer with 6 years in the industry, "
                 "specializing in Python and cloud technologies. Proven track record "
@@ -228,12 +234,14 @@ def input_form() -> None:
 
         # st.write(f"resume_text: {resume_text}")
         if candidate_input_method != "Text Input" and resume_text:
-            st.text_area("Parsed data", resume_text, height=300, disabled=True)
+            st.text_area(
+                "Parsed resume", resume_text, key="cv", height=250, disabled=True
+            )
 
     with col2:
         st.subheader("Vacancy")
         job_input_method = st.radio(
-            "",
+            "Select resume input method",
             label_visibility="collapsed",
             options=["Text Input", "Upload PDF"],
             horizontal=True,
@@ -241,14 +249,14 @@ def input_form() -> None:
         )
 
         if job_input_method == "Upload PDF":
-            job_pdf = st.file_uploader(label="Upload .pdf resume", type="pdf")
+            job_pdf = st.file_uploader(label="Upload .pdf job description", type="pdf")
             if job_pdf:
                 job_pdf_to_text = PDFToText(job_pdf)
                 vacancy_text = job_pdf_to_text.extract_text()
         else:
             vacancy_text = st.text_area(
                 "Vacancy Description 📝",
-                # height=250,
+                height=200,
                 help="Example:\n"
                 "We are seeking a Senior Software Engineer with at least 5 years "
                 "of experience in software development. The ideal candidate should "
@@ -261,7 +269,16 @@ def input_form() -> None:
             )
 
         if job_input_method != "Text Input" and vacancy_text:
-            st.text_area("Parsed data", vacancy_text, height=300, disabled=True)
+            st.text_area(
+                "Parsed vacancy", vacancy_text, key="vacancy", height=250, disabled=True
+            )
+
+    hr_comment = st.text_area(
+        "HR Comment 📝",
+        # height=250,
+        help="Example:\n" "Great expirience, but rather bad match ",
+        placeholder=("Enter any comments...\n\n"),
+    )
 
     submitted = st.button("Calculate Match 🚀")
 
@@ -272,7 +289,7 @@ def input_form() -> None:
 
         with st.spinner("Calculating match..."):
             score, description = get_match_score(
-                vacancy_text, resume_text, predictor_type, selected_model
+                vacancy_text, resume_text, hr_comment, predictor_type, selected_model
             )
             display_results(score, description)
 
