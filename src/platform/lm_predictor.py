@@ -134,8 +134,6 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
         else:
             # Fall back to plain text format
             score_match = re.search(r"(\d+\.?\d*)/5", response)
-            if score_match is None:
-                score_match = re.search(r"(\d+\.?\d*)")
             score = float(score_match.group(1)) if score_match else None
             
             # Remove score from thought if present
