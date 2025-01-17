@@ -1,10 +1,12 @@
 import os
 from typing import Optional, Tuple
-
+import re
 import requests
 
 from src.platform.base_predictor import BasePredictor
 from src.platform.prompts.simple_prompt import FEW_SHOT_EXAMPLES, PROMPT
+
+
 
 
 class LMPredictor(BasePredictor):
@@ -18,7 +20,7 @@ class LMPredictor(BasePredictor):
         api_key: str = "not-needed",  # LM Studio, for example, doesn't need real key
         model: str = "local-model",
         temperature: float = 0.7,
-        max_tokens: int = 4096,
+        max_tokens: int = 256,
         prompt_template: Optional[str] = None,
     ):
         """
@@ -63,7 +65,16 @@ class LMPredictor(BasePredictor):
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant that evaluates job candidate matches. Always provide a score between 0 and 1, followed by a detailed explanation.",
+                    "content": """<|im_start|>system
+You are an advanced AI model designed to analyze the compatibility between a CV and a job description. You will receive a CV and a job description. Your task is to output a structured message in XML format that includes the following:
+            
+            1. though: Provide a short comment explaining your score.
+            2. score: Provide a numerical compatibility score (1-5) based on qualifications, skills, and experience.
+
+            Your output must be in XML format as follows:
+            <thought> Your comment here. </thought>
+            <score> Your score from 1 to 5 here </score>
+<|im_end|>""",
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -99,7 +110,37 @@ class LMPredictor(BasePredictor):
         except Exception as e:
             # print(f"Unexpected error: {str(e, e.response.text)}")
             raise Exception(f"API call failed: {str(e, e.response.text)}")
-
+    def parse_response(self, response: str):
+        """Parse model response to extract thought and score"""
+        # Try XML format first
+        thought_match = re.search(r"<thought>(.*?)</thought>", response, re.DOTALL)
+        if thought_match is None:
+            thought_match = re.search(r"<thoughts>(.*?)</thoughts>", response, re.DOTALL)
+            
+        score_start = response.find("<score>")
+        score_end = response.find("</score>")
+        if score_start != -1 and score_end != -1:
+            score_content = response[score_start + len("<score>"):score_end].strip()
+            if "/" in score_content:
+                score_value = float(score_content.split("/")[0].strip())
+            else:
+                score_value = float(score_content)
+        else:
+            score_value = None
+            
+        if thought_match and score_value:
+            thought = thought_match.group(1).strip()
+            score = score_value
+        else:
+            # Fall back to plain text format
+            score_match = re.search(r"(\d+\.?\d*)/5", response)
+            if score_match is None:
+                score_match = re.search(r"(\d+\.?\d*)")
+            score = float(score_match.group(1)) if score_match else None
+            
+            # Remove score from thought if present
+            thought = re.sub(r"\d+\.?\d*/5", "", response).strip()
+        return {"thought": thought, "score": score}
     def predict(
         self,
         candidate_description: str,
@@ -120,39 +161,23 @@ class LMPredictor(BasePredictor):
                 - str: Detailed description of the match analysis
         """
         # Use the predefined prompt template
-        prompt = self.prompt_template.format(
-            few_shot_examples=FEW_SHOT_EXAMPLES,
+        prompt = f"""<|im_start|>user
+                Please evaluate this candidate:
+                <CV> 
+                {candidate_description} 
+                </CV>
+                <job_description> 
+                {vacancy_description} 
+                </job_description>
+                <|im_end|>""".format(
             vacancy_description=vacancy_description,
             candidate_description=candidate_description,
         )
 
-        print("Generated prompt:", prompt)  # Log the generated prompt
-
         try:
-            response = "<thought>\n" + self._call_api(prompt)
-            print("API response received:", response)  # Log the API response
-
-            # Extract the thought/analysis and score from the response
-            thought = ""
-            score = 0.0
-
-            if "</thought>" in response:
-                thought = response.split("<thought>")[1].split("</thought>")[0].strip()
-                print("Extracted thought:", thought)  # Log the extracted thought
-
-            if "<score>" in response and "</score>" in response:
-                try:
-                    score_str = (
-                        response.split("<score>")[1].split("</score>")[0].strip()
-                    )
-                    score = float(score_str) / 100.0  # Convert 0-100 score to 0-1
-                    score = max(0.0, min(1.0, score))  # Ensure score is between 0 and 1
-                    print("Extracted score:", score)  # Log the extracted score
-                except (ValueError, IndexError):
-                    print("Error parsing score, defaulting to 0.0")  # Log parsing error
-                    score = 0.0
-
-            return score, thought
+            response = self._call_api(prompt)
+            result = self.parse_response(response)
+            return result['score'], result['thought']
 
         except Exception as e:
             print("Error during prediction:", str(e))  # Log the error

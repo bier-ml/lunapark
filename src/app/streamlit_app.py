@@ -158,17 +158,15 @@ def display_results(score: float, description: Optional[str]) -> None:
     """Display the matching results with appropriate styling."""
     st.subheader("📊 Results")
 
-    # Display score with color coding
-    score_percentage = f"{score:.0%}"
-    if score >= 0.7:
-        st.success(f"Match Score: {score_percentage}")
-    elif score >= 0.4:
-        st.warning(f"Match Score: {score_percentage}")
+    if score >= 4:
+        st.success(f"Match Score: {score}")
+    elif score >= 3:
+        st.warning(f"Match Score: {score}")
     else:
-        st.error(f"Match Score: {score_percentage}")
+        st.error(f"Match Score: {score}")
 
     # Display the score gauge
-    st.progress(score)
+    st.progress(score/5)
 
     # Display analysis if available
     if description:
