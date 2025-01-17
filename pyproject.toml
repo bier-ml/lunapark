@@ -35,6 +35,7 @@ ipykernel = "^6.29.5"
 
 [tool.poetry.group.web.dependencies]
 streamlit = "^1.39.0"
+pypdf = "^5.1.0"
 
 [build-system]
 requires = ["poetry-core"]

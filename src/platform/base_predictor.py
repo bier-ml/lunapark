@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 
 class BasePredictor(ABC):
@@ -7,7 +7,10 @@ class BasePredictor(ABC):
 
     @abstractmethod
     def predict(
-        self, candidate_description: str, vacancy_description: str
+        self,
+        candidate_description: str,
+        vacancy_description: str,
+        hr_comment: str,
     ) -> Tuple[float, Optional[str]]:
         """
         Predict match score between candidate and vacancy.
@@ -15,6 +18,7 @@ class BasePredictor(ABC):
         Args:
             candidate_description (str): Description of the candidate's experience and skills
             vacancy_description (str): Description of the job vacancy requirements
+            hr_comment (str): HR comments
 
         Returns:
             Tuple[float, str]: A tuple containing:
@@ -23,8 +27,7 @@ class BasePredictor(ABC):
         """
         pass
 
-    @classmethod
     @abstractmethod
-    def get_available_models(cls) -> Tuple[str, ...]:
+    def get_available_models(self) -> Tuple[str, ...]:
         """Return tuple of available models for this predictor."""
         pass

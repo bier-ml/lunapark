@@ -6,12 +6,12 @@ of the matching service by sending sample requests and validating responses.
 """
 
 import json
-from typing import Dict, NoReturn
+from typing import Dict
 
 import requests
 from fastapi.testclient import TestClient
 
-from app import app
+from app import app  # type: ignore
 
 client = TestClient(app)
 
@@ -37,13 +37,16 @@ def test_prediction_endpoint() -> None:
     test_data: Dict[str, str] = {
         "vacancy_description": "3+ years Python experience required, Bachelor's degree in Computer Science, ML and FastAPI knowledge required",
         "candidate_description": "5 years of Python experience, Masters in Computer Science, Machine Learning and FastAPI expertise",
-        "predictor_type": "dummy",
+        "hr_comment": "",
+        "predictor_type": "lm",
     }
 
     try:
         # Make POST request to the API
         response: requests.Response = requests.post(
-            url, json=test_data, headers={"Content-Type": "application/json"}
+            url,
+            json=test_data,
+            headers={"Content-Type": "application/json"},
         )
 
         # Check if request was successful
@@ -65,7 +68,8 @@ def test_calculate_match():
         json={
             "vacancy_description": "Python developer with 3+ years of experience",
             "candidate_description": "5 years of Python development experience",
-            "predictor_type": "dummy",
+            "hr_comment": "",
+            "predictor_type": "lm",
         },
     )
     assert response.status_code == 200
@@ -83,6 +87,7 @@ def test_invalid_predictor():
         json={
             "vacancy_description": "Python developer",
             "candidate_description": "Python experience",
+            "hr_comment": "",
             "predictor_type": "invalid_predictor",
         },
     )

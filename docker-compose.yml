@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   frontend:
     build:
@@ -24,7 +23,7 @@ services:
     ports:
       - 8000:8000
     environment:
-      - LM_API_BASE_URL=http://host.docker.internal:1234/v1
+      - LM_API_BASE_URL=http://host.docker.internal:5001/v1
     volumes:
       - ./:/app
     restart: always
