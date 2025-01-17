@@ -1,5 +1,5 @@
 import random
-from typing import List, Optional, Tuple
+from typing import Tuple
 
 from src.platform.base_predictor import BasePredictor
 
@@ -8,7 +8,10 @@ class DummyPredictor(BasePredictor):
     """A simple dummy predictor that generates random scores and basic descriptions."""
 
     def predict(
-        self, candidate_description: str, vacancy_description: str
+        self,
+        candidate_description: str,
+        vacancy_description: str,
+        hr_comment: str,
     ) -> tuple[float, str]:
         """
         Generate a random score and simple description for testing purposes.
@@ -16,12 +19,13 @@ class DummyPredictor(BasePredictor):
         Args:
             candidate_description (str): Description of the candidate's experience and skills
             vacancy_description (str): Description of the job vacancy requirements
+            hr_comment (str): HR comments about candidate's experience
 
         Returns:
             Tuple[float, str]: Random score between 0.1 and 0.9 and a basic description
         """
 
-        _, _ = candidate_description, vacancy_description
+        _, _, _ = candidate_description, vacancy_description, hr_comment
 
         # Generate random score between 0.1 and 0.9
         score = round(random.uniform(0.1, 0.9), 2)
@@ -36,6 +40,5 @@ class DummyPredictor(BasePredictor):
 
         return score, description
 
-    @classmethod
-    def get_available_models(cls) -> Tuple[str]:
+    def get_available_models(self) -> Tuple[str]:
         return ("dummy-model-v1",)  # Dummy predictor has only one model

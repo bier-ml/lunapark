@@ -29,10 +29,12 @@ pre-commit = "^4.0.1"
 ruff = "^0.7.1"
 isort = "^5.13.2"
 mypy = "^1.13.0"
+ipykernel = "^6.29.5"
 
 
 [tool.poetry.group.web.dependencies]
 streamlit = "^1.39.0"
+pypdf = "^5.1.0"
 
 [build-system]
 requires = ["poetry-core"]
