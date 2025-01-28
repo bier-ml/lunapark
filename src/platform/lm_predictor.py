@@ -1,12 +1,10 @@
 import os
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 import re
 import requests
 
 from src.platform.base_predictor import BasePredictor
 from src.platform.prompts.simple_prompt import FEW_SHOT_EXAMPLES, PROMPT
-
-
 
 
 class LMPredictor(BasePredictor):
@@ -16,11 +14,11 @@ class LMPredictor(BasePredictor):
 
     def __init__(
         self,
-        api_base_url: str = os.getenv("LM_API_BASE_URL", "http://localhost:5001/v1"),
-        api_key: str = "not-needed",  # LM Studio, for example, doesn't need real key
-        model: str = "local-model",
-        temperature: float = 0.7,
-        max_tokens: int = 256,
+        api_base_url: str = os.getenv("RUNPOD_ENDPOINT_URL", os.getenv("LM_API_BASE_URL")),
+        api_key: str = os.getenv("LM_API_KEY", "not-needed"),
+        model: str = os.getenv("LM_MODEL", "local-model"),
+        temperature: float = float(os.getenv("LM_TEMPERATURE", "0.7")),
+        max_tokens: int = int(os.getenv("LM_MAX_TOKENS", "256")),
         prompt_template: Optional[str] = None,
     ):
         """
@@ -110,24 +108,27 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
         except Exception as e:
             # print(f"Unexpected error: {str(e, e.response.text)}")
             raise Exception(f"API call failed: {str(e, e.response.text)}")
+
     def parse_response(self, response: str):
         """Parse model response to extract thought and score"""
         # Try XML format first
         thought_match = re.search(r"<thought>(.*?)</thought>", response, re.DOTALL)
         if thought_match is None:
-            thought_match = re.search(r"<thoughts>(.*?)</thoughts>", response, re.DOTALL)
-            
+            thought_match = re.search(
+                r"<thoughts>(.*?)</thoughts>", response, re.DOTALL
+            )
+
         score_start = response.find("<score>")
         score_end = response.find("</score>")
         if score_start != -1 and score_end != -1:
-            score_content = response[score_start + len("<score>"):score_end].strip()
+            score_content = response[score_start + len("<score>") : score_end].strip()
             if "/" in score_content:
                 score_value = float(score_content.split("/")[0].strip())
             else:
                 score_value = float(score_content)
         else:
             score_value = None
-            
+
         if thought_match and score_value:
             thought = thought_match.group(1).strip()
             score = score_value
@@ -135,10 +136,11 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
             # Fall back to plain text format
             score_match = re.search(r"(\d+\.?\d*)/5", response)
             score = float(score_match.group(1)) if score_match else None
-            
+
             # Remove score from thought if present
             thought = re.sub(r"\d+\.?\d*/5", "", response).strip()
         return {"thought": thought, "score": score}
+
     def predict(
         self,
         candidate_description: str,
@@ -181,12 +183,21 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
             print("Error during prediction:", str(e))  # Log the error
             return 0.0, f"Error in prediction: {str(e)}"
 
-    def get_available_models(self) -> Tuple[str, ...]:
+    def get_available_models(self) -> List[str]:
+        """Get list of available models from the API."""
+        if not self.api_base_url:
+            return [""]  # Return default model if no API URL
+        
         try:
-            response = requests.get(
-                f"{self.api_base_url}/models",
-            )
-            response.raise_for_status()
-            return [model["id"] for model in response.json()["data"]]
+            # Ensure api_base_url has a scheme
+            if not self.api_base_url.startswith(('http://', 'https://')):
+                self.api_base_url = f"https://{self.api_base_url}"
+                
+            response = requests.get(f"{self.api_base_url.rstrip('/')}/models", timeout=30)
+            if response.status_code == 200:
+                return [model["id"] for model in response.json()["data"]]
+            return [""]  # Fallback to default model
+            
         except Exception as e:
-            raise Exception(f"API call failed: {str(e)}")
+            print(f"Warning: Failed to fetch models: {str(e)}")
+            return [""]  # Fallback to default model
