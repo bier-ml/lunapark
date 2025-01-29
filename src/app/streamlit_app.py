@@ -1,11 +1,13 @@
 import os
-from http import HTTPStatus
 import time
+from http import HTTPStatus
+
 import requests
 import streamlit as st
 from tools import PDFToText  # type: ignore
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+
 
 def main():
     """Main application function containing all the Streamlit app logic."""
@@ -13,13 +15,12 @@ def main():
     st.set_page_config(
         page_title="JobMatch",
         page_icon="https://hrlunapark.com/favicon-32x32.png",
-        layout="wide"
+        layout="wide",
     )
 
     # Header
     st.write(
-        "<style>div.block-container{padding-top:1rem;}</style>", 
-        unsafe_allow_html=True
+        "<style>div.block-container{padding-top:1rem;}</style>", unsafe_allow_html=True
     )
     st.markdown(
         "# JobMatch // <span style='color: #ff6db3;'>Luna Park</span>",
@@ -28,13 +29,13 @@ def main():
 
     # GPU Pod Management
     st.markdown("## 🖥️ GPU Pod Management")
-    max_retries = 1
-    
+    max_retries = 100
+
     try:
         # Initialize retry counter in session state if not exists
-        if 'status_check_count' not in st.session_state:
+        if "status_check_count" not in st.session_state:
             st.session_state.status_check_count = 0
-            
+
         # Check if pod exists and is ready
         with st.spinner("Checking GPU Pod status..."):
             # Get pods list
@@ -44,11 +45,10 @@ def main():
                 if pods:
                     pod = pods[0]
                     pod_id = pod["pod_id"]
-                    
+
                     # Check pod status
                     status_response = requests.get(
-                        f"{API_URL}/pods/{pod_id}/status",
-                        timeout=180
+                        f"{API_URL}/pods/{pod_id}/status", timeout=180
                     )
                     if status_response.status_code == 200:
                         status_data = status_response.json()
@@ -58,7 +58,9 @@ def main():
                             st.success("✅ GPU Pod is ready")
                             if st.button("🛑 Terminate GPU Pod"):
                                 with st.spinner("Terminating GPU Pod..."):
-                                    delete_response = requests.delete(f"{API_URL}/pods/{pod_id}", timeout=180)
+                                    delete_response = requests.delete(
+                                        f"{API_URL}/pods/{pod_id}", timeout=180
+                                    )
                                     if delete_response.status_code == 200:
                                         st.rerun()
                                     else:
@@ -69,11 +71,14 @@ def main():
                             if st.session_state.status_check_count >= max_retries:
                                 # Terminate pod after too many retries
                                 st.error("Pod startup timeout. Terminating pod...")
-                                delete_response = requests.delete(f"{API_URL}/pods/{pod_id}", timeout=180)
+                                delete_response = requests.delete(
+                                    f"{API_URL}/pods/{pod_id}", timeout=180
+                                )
                                 st.session_state.status_check_count = 0  # Reset counter
                                 st.rerun()
                             else:
                                 # Pod exists but not ready - keep spinner and refresh
+                                time.sleep(10)
                                 st.rerun()
                 else:
                     # No pods - show create button
@@ -81,6 +86,7 @@ def main():
                     if st.button("🚀 Create GPU Pod"):
                         response = requests.post(f"{API_URL}/pods", timeout=180)
                         if response.status_code == 200:
+                            time.sleep(10)
                             st.rerun()
                         else:
                             st.error("Failed to create GPU Pod")
@@ -90,11 +96,13 @@ def main():
     # Get available predictors and models
     try:
         predictor_response = requests.get(f"{API_URL}/available-models", timeout=180)
-        models_response = requests.get(f"{API_URL}/available-models-per-predictor", timeout=180)
-        
+        models_response = requests.get(
+            f"{API_URL}/available-models-per-predictor", timeout=180
+        )
+
         available_predictors = ["dummy"]
         models_per_predictor = {"dummy": ["dummy-model-v1"]}
-        
+
         if predictor_response.status_code == HTTPStatus.OK:
             available_predictors = predictor_response.json()["predictor_types"]
         if models_response.status_code == HTTPStatus.OK:
@@ -111,17 +119,20 @@ def main():
             "Select matching algorithm 🔍",
             options=available_predictors,
             index=0,
-            help="Choose which algorithm to use for matching"
+            help="Choose which algorithm to use for matching",
         )
 
     with col2:
         selected_model = None
-        if predictor_type in models_per_predictor and models_per_predictor[predictor_type]:
+        if (
+            predictor_type in models_per_predictor
+            and models_per_predictor[predictor_type]
+        ):
             selected_model = st.selectbox(
                 "Model",
                 options=models_per_predictor[predictor_type],
                 index=0,
-                help="Choose which specific model to use"
+                help="Choose which specific model to use",
             )
 
     # Input Form
@@ -144,7 +155,7 @@ def main():
                 "Candidate Description 👤",
                 height=200,
                 help="Enter candidate description",
-                placeholder="Enter the candidate's information..."
+                placeholder="Enter the candidate's information...",
             )
         else:
             resume_pdf = st.file_uploader(label="Upload resume (.pdf)", type="pdf")
@@ -168,7 +179,7 @@ def main():
                 "Vacancy Description 📝",
                 height=200,
                 help="Enter vacancy description",
-                placeholder="Enter the job vacancy description..."
+                placeholder="Enter the job vacancy description...",
             )
         else:
             job_pdf = st.file_uploader(label="Upload .pdf job description", type="pdf")
@@ -180,7 +191,7 @@ def main():
     hr_comment = st.text_area(
         "HR Comment 📝",
         help="Enter any additional comments",
-        placeholder="Enter any comments..."
+        placeholder="Enter any comments...",
     )
 
     # Match Calculation
@@ -220,7 +231,7 @@ def main():
                     else:
                         st.error(f"Match Score: {score}")
 
-                    st.progress(score/5)
+                    st.progress(score / 5)
 
                     if description:
                         st.subheader("🔍 Analysis")
@@ -230,6 +241,7 @@ def main():
 
             except requests.exceptions.RequestException as e:
                 st.error(f"Connection Error: {str(e)}")
+
 
 if __name__ == "__main__":
     main()

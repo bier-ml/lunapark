@@ -80,6 +80,7 @@ class AvailableModelsPerPredictorResponse(BaseModel):
         description="Dictionary mapping predictor types to their available models"
     )
 
+
 class CreatePodResponse(BaseModel):
     pod_id: str
     endpoint_url: str

@@ -1,6 +1,7 @@
 import os
-from typing import Optional, Tuple, List
 import re
+from typing import List, Optional, Tuple
+
 import requests
 
 from src.platform.base_predictor import BasePredictor
@@ -14,7 +15,9 @@ class LMPredictor(BasePredictor):
 
     def __init__(
         self,
-        api_base_url: str = os.getenv("RUNPOD_ENDPOINT_URL", os.getenv("LM_API_BASE_URL")),
+        api_base_url: str = os.getenv(
+            "RUNPOD_ENDPOINT_URL", os.getenv("LM_API_BASE_URL")
+        ),
         api_key: str = os.getenv("LM_API_KEY", "not-needed"),
         model: str = os.getenv("LM_MODEL", "local-model"),
         temperature: float = float(os.getenv("LM_TEMPERATURE", "0.7")),
@@ -169,15 +172,19 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
                 <job_description> 
                 {vacancy_description} 
                 </job_description>
+                <hr_comment>
+                {hr_comment}
+                </hr_comment>
                 <|im_end|>""".format(
             vacancy_description=vacancy_description,
             candidate_description=candidate_description,
+            hr_comment=hr_comment,
         )
 
         try:
             response = self._call_api(prompt)
             result = self.parse_response(response)
-            return result['score'], result['thought']
+            return result["score"], result["thought"]
 
         except Exception as e:
             print("Error during prediction:", str(e))  # Log the error
@@ -187,17 +194,19 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
         """Get list of available models from the API."""
         if not self.api_base_url:
             return [""]  # Return default model if no API URL
-        
+
         try:
             # Ensure api_base_url has a scheme
-            if not self.api_base_url.startswith(('http://', 'https://')):
+            if not self.api_base_url.startswith(("http://", "https://")):
                 self.api_base_url = f"https://{self.api_base_url}"
-                
-            response = requests.get(f"{self.api_base_url.rstrip('/')}/models", timeout=30)
+
+            response = requests.get(
+                f"{self.api_base_url.rstrip('/')}/models", timeout=30
+            )
             if response.status_code == 200:
                 return [model["id"] for model in response.json()["data"]]
             return [""]  # Fallback to default model
-            
+
         except Exception as e:
             print(f"Warning: Failed to fetch models: {str(e)}")
             return [""]  # Fallback to default model

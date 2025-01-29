@@ -48,20 +48,23 @@ def get_predictor(
         api_base_url = (
             parameters.api_base_url  # type: ignore
             if parameters and parameters.api_base_url
-            else os.getenv("RUNPOD_ENDPOINT_URL")
-            or os.getenv("LM_API_BASE_URL")
+            else os.getenv("RUNPOD_ENDPOINT_URL") or os.getenv("LM_API_BASE_URL")
         )
-        
+
         if not api_base_url:
             raise HTTPException(
                 status_code=400,
-                detail="No LLM endpoint URL available. Please create a GPU pod first."
+                detail="No LLM endpoint URL available. Please create a GPU pod first.",
             )
-            
+
         return LMPredictor(
             api_base_url=api_base_url,
-            api_key=parameters.api_key if parameters else os.getenv("LM_API_KEY", "not-needed"),  # type: ignore
-            model=parameters.model if parameters else os.getenv("LM_MODEL", "QuantFactory/Meta-Llama-3-8B-GGUF"),  # type: ignore
+            api_key=parameters.api_key
+            if parameters
+            else os.getenv("LM_API_KEY", "not-needed"),  # type: ignore
+            model=parameters.model
+            if parameters
+            else os.getenv("LM_MODEL", "QuantFactory/Meta-Llama-3-8B-GGUF"),  # type: ignore
         )
     return None
 
@@ -79,13 +82,13 @@ async def calculate_match(request: MatchRequest) -> MatchResponse:
         if not predictor:
             return MatchResponse(
                 score=0.0,
-                description=f"Unsupported predictor type: {request.predictor_type}"
+                description=f"Unsupported predictor type: {request.predictor_type}",
             )
 
         score, description = predictor.predict(
             request.candidate_description,
             request.vacancy_description,
-            request.hr_comment
+            request.hr_comment,
         )
 
         # Ensure we have valid values
@@ -99,8 +102,7 @@ async def calculate_match(request: MatchRequest) -> MatchResponse:
     except Exception as e:
         print(f"Match calculation error: {str(e)}")
         return MatchResponse(
-            score=0.0,
-            description=f"Failed to calculate match: {str(e)}"
+            score=0.0, description=f"Failed to calculate match: {str(e)}"
         )
 
 
@@ -125,7 +127,7 @@ async def get_available_models() -> AvailableModelsResponse:
 async def get_available_models_per_predictor() -> AvailableModelsPerPredictorResponse:
     """Get available models for each predictor type."""
     models_dict = {}
-    
+
     for predictor_type, predictor_class in PREDICTOR_CLASSES.items():
         try:
             if predictor_type == "lm":
@@ -133,16 +135,18 @@ async def get_available_models_per_predictor() -> AvailableModelsPerPredictorRes
                 predictor = get_predictor(predictor_type)
             else:
                 predictor = predictor_class()
-                
+
             if predictor:
-                models_dict[PredictorType(predictor_type)] = predictor.get_available_models()
+                models_dict[PredictorType(predictor_type)] = (
+                    predictor.get_available_models()
+                )
             else:
                 models_dict[PredictorType(predictor_type)] = []
-                
+
         except Exception as e:
             print(f"Warning: Failed to get models for {predictor_type}: {str(e)}")
             models_dict[PredictorType(predictor_type)] = []
-            
+
     return AvailableModelsPerPredictorResponse(models=models_dict)
 
 
