@@ -13,6 +13,7 @@ python = "^3.11"
 types-requests = "^2.31.0"
 python-dotenv = "^1.0.1"
 runpod = "^1.7.7"
+pypdf2 = "^3.0.1"
 
 
 [tool.poetry.group.research.dependencies]

@@ -83,11 +83,6 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
             "max_tokens": self.max_tokens,
         }
 
-        # Add detailed logging
-        # print(f"Making API call to: {self.api_base_url}/chat/completions")
-        # print(f"Request Headers: {headers}")
-        # print(f"Request Payload: {payload}")
-
         try:
             response = requests.post(
                 f"{self.api_base_url}/chat/completions",
@@ -96,20 +91,13 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
                 timeout=180,
             )
 
-            # Add response logging
-            # print(f"Response Status Code: {response.status_code}")
-            # print(f"Response Headers: {dict(response.headers)}")
-            # print(f"Response Content: {response.text}")
-
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"]
         except requests.exceptions.RequestException as e:
-            # print(f"Request Exception: {str(e)}")
             if hasattr(e.response, "text"):
                 print(f"Error Response Content: {e.response.text}")
             raise Exception(f"API call failed: {str(e)}")
         except Exception as e:
-            # print(f"Unexpected error: {str(e, e.response.text)}")
             raise Exception(f"API call failed: {str(e, e.response.text)}")
 
     def parse_response(self, response: str):
@@ -172,8 +160,8 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
                 <job_description> 
                 {vacancy_description} 
                 </job_description>
-                <hr_comment>
-                {hr_comment}
+                <hr_comment> 
+                {hr_comment} 
                 </hr_comment>
                 <|im_end|>""".format(
             vacancy_description=vacancy_description,
