@@ -86,6 +86,7 @@ class AvailableModelsPerPredictorResponse(BaseModel):
 
 class MatchResult(Model):
     """Database model for storing match results."""
+
     id = fields.IntField(pk=True)
     vacancy_description = fields.TextField()
     candidate_description = fields.TextField()
@@ -104,7 +105,7 @@ class MatchResult(Model):
 
 class MatchService:
     """Service class for handling match result database operations."""
-    
+
     @staticmethod
     async def save_match_result(
         vacancy_description: str,
@@ -131,7 +132,9 @@ class MatchService:
         offset: int = 0,
     ) -> List[MatchResult]:
         """Get match results with pagination."""
-        return await MatchResult.all().order_by("-created_at").offset(offset).limit(limit)
+        return (
+            await MatchResult.all().order_by("-created_at").offset(offset).limit(limit)
+        )
 
     @staticmethod
     async def get_match_result_by_id(match_id: int) -> Optional[MatchResult]:
@@ -146,17 +149,21 @@ class MatchService:
     ) -> Optional[MatchResult]:
         """
         Find an existing match result for the given vacancy and candidate descriptions.
-        
+
         Args:
             vacancy_description: The job description
             candidate_description: The candidate's profile
             predictor_type: The type of predictor used
-            
+
         Returns:
             Optional[MatchResult]: The existing match result if found, None otherwise
         """
-        return await MatchResult.filter(
-            vacancy_description=vacancy_description,
-            candidate_description=candidate_description,
-            predictor_type=predictor_type,
-        ).order_by("-created_at").first()
+        return (
+            await MatchResult.filter(
+                vacancy_description=vacancy_description,
+                candidate_description=candidate_description,
+                predictor_type=predictor_type,
+            )
+            .order_by("-created_at")
+            .first()
+        )
