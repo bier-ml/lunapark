@@ -24,6 +24,13 @@ services:
       - 8000:8000
     environment:
       - LM_API_BASE_URL=http://host.docker.internal:5001/v1
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=lunapark
+    depends_on:
+      - postgres
     volumes:
       - ./:/app
     restart: always
@@ -31,6 +38,24 @@ services:
       - app
     container_name: backend
 
+  postgres:
+    image: postgres:15
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=lunapark
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app
+    container_name: postgres
+    restart: always
+
 networks:
   app:
     driver: bridge
+
+volumes:
+  postgres_data:

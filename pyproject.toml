@@ -12,6 +12,13 @@ packages = [
 python = "^3.11"
 types-requests = "^2.31.0"
 python-dotenv = "^1.0.1"
+tortoise-orm = {extras = ["psycopg"], version = "^0.25.0"}
+uvicorn = "^0.34.2"
+streamlit = "^1.44.1"
+pypdf = "^5.4.0"
+fastapi = "^0.115.12"
+asyncpg = "^0.30.0"
+aerich = "^0.8.2"
 
 
 [tool.poetry.group.research.dependencies]
@@ -22,7 +29,6 @@ notebook = "^7.2.2"
 [tool.poetry.group.service.dependencies]
 fastapi = "^0.115.3"
 requests = "^2.32.3"
-uvicorn = "^0.32.0"
 
 
 [tool.poetry.group.dev.dependencies]

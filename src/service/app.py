@@ -6,11 +6,13 @@ from fastapi import FastAPI, HTTPException
 
 from src.platform.dummy_predictor import DummyPredictor
 from src.platform.lm_predictor import LMPredictor
+from src.service.database import init_db_for_fastapi
 from src.service.models import (
     AvailableModelsPerPredictorResponse,
     AvailableModelsResponse,
     MatchRequest,
     MatchResponse,
+    MatchService,
     PredictorParameters,
     PredictorType,
 )
@@ -20,6 +22,8 @@ app = FastAPI(
     description="API for predicting candidate match scores for positions",
     version="1.0.0",
 )
+
+init_db_for_fastapi(app)
 
 PREDICTOR_CLASSES = {
     "lm": LMPredictor,
@@ -58,6 +62,18 @@ def get_predictor(
 )
 async def calculate_match(request: MatchRequest) -> MatchResponse:
     """Calculate match score between vacancy and candidate."""
+    existing_match = await MatchService.find_existing_match(
+        vacancy_description=request.vacancy_description,
+        candidate_description=request.candidate_description,
+        predictor_type=request.predictor_type,
+    )
+
+    if existing_match:
+        return MatchResponse(
+            score=existing_match.score,
+            description=existing_match.description,
+        )
+
     predictor = get_predictor(request.predictor_type, request.predictor_parameters)
     if not predictor:
         raise HTTPException(
@@ -67,6 +83,15 @@ async def calculate_match(request: MatchRequest) -> MatchResponse:
 
     score, description = predictor.predict(
         request.candidate_description, request.vacancy_description, request.hr_comment
+    )
+
+    await MatchService.save_match_result(
+        vacancy_description=request.vacancy_description,
+        candidate_description=request.candidate_description,
+        hr_comment=request.hr_comment,
+        predictor_type=request.predictor_type,
+        score=score,
+        description=description,
     )
 
     return MatchResponse(score=score, description=description)
