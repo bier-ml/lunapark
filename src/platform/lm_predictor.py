@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 import requests
 
 from src.platform.base_predictor import BasePredictor
-from src.platform.prompts.simple_prompt import FEW_SHOT_EXAMPLES, PROMPT
+from src.platform.prompts.simple_prompt import PROMPT
 
 
 class LMPredictor(BasePredictor):
@@ -15,13 +15,18 @@ class LMPredictor(BasePredictor):
 
     def __init__(
         self,
-        api_base_url: str = os.getenv(
-            "RUNPOD_ENDPOINT_URL", os.getenv("LM_API_BASE_URL")
-        ),
+        api_base_url: str = "http://localhost:1234/v1",
+        # os.getenv(
+        # "RUNPOD_ENDPOINT_URL",
+        # os.getenv("LM_API_BASE_URL", "http://localhost:1234/v1"),
+        # ),
         api_key: str = os.getenv("LM_API_KEY", "not-needed"),
         model: str = os.getenv("LM_MODEL", "local-model"),
-        temperature: float = float(os.getenv("LM_TEMPERATURE", "0.7")),
+        temperature: float = float(os.getenv("LM_TEMPERATURE", "0.1")),
         max_tokens: int = int(os.getenv("LM_MAX_TOKENS", "256")),
+        seed: Optional[int] = int(os.getenv("LM_SEED", "42"))
+        if os.getenv("LM_SEED")
+        else None,
         prompt_template: Optional[str] = None,
     ):
         """
@@ -33,6 +38,7 @@ class LMPredictor(BasePredictor):
             model: Model identifier to use
             temperature: Sampling temperature (0.0 to 1.0)
             max_tokens: Maximum tokens in the response
+            seed: Random seed for deterministic generation
             prompt_template: Custom prompt template (uses default if None)
         """
         super().__init__()
@@ -41,6 +47,7 @@ class LMPredictor(BasePredictor):
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.seed = seed
         self.prompt_template = prompt_template or PROMPT
 
     def _call_api(self, prompt: str) -> str:
@@ -83,12 +90,16 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
             "max_tokens": self.max_tokens,
         }
 
+        # Add seed for deterministic output if provided
+        if self.seed is not None:
+            payload["seed"] = self.seed
+
         try:
             response = requests.post(
                 f"{self.api_base_url}/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=180,
+                timeout=600,
             )
 
             response.raise_for_status()
@@ -137,6 +148,8 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
         candidate_description: str,
         vacancy_description: str,
         hr_comment: str,
+        temperature: Optional[float] = None,
+        seed: Optional[int] = None,
     ) -> Tuple[float, Optional[str]]:
         """
         Predict match score and generate description for candidate-vacancy pair.
@@ -145,6 +158,8 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
             candidate_description (str): Description of the candidate's experience and skills
             vacancy_description (str): Description of the job vacancy requirements
             hr_comment (str): HR comments about candidate's experience
+            temperature (float, optional): Override temperature for this prediction
+            seed (int, optional): Override seed for this prediction
 
         Returns:
             Tuple[float, str]: A tuple containing:
@@ -170,7 +185,25 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
         )
 
         try:
+            # Use a lower temperature for this call if specified
+            old_temp = self.temperature
+            old_seed = self.seed
+
+            if temperature is not None:
+                self.temperature = temperature
+
+            if seed is not None:
+                self.seed = seed
+
             response = self._call_api(prompt)
+
+            # Restore original parameters
+            if temperature is not None:
+                self.temperature = old_temp
+
+            if seed is not None:
+                self.seed = old_seed
+
             result = self.parse_response(response)
             return result["score"], result["thought"]
 
@@ -189,7 +222,7 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
                 self.api_base_url = f"https://{self.api_base_url}"
 
             response = requests.get(
-                f"{self.api_base_url.rstrip('/')}/models", timeout=30
+                f"{self.api_base_url.rstrip('/')}/models", timeout=600
             )
             if response.status_code == 200:
                 return [model["id"] for model in response.json()["data"]]

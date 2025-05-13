@@ -9,20 +9,25 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
-types-requests = "^2.31.0"
-python-dotenv = "^1.0.1"
-runpod = "^1.7.7"
+python = ">=3.11,<3.13"
+python-dotenv = "^1.1.0"
+runpod = "^1.7.9"
+scikit-learn = "^1.6.1"
+numpy = "^2.2.5"
+pyairtable = "^3.1.1"
+neo4j = "^5.28.1"
+sentence-transformers = "^4.1.0"
+neo4j-graphrag = "^1.7.0"
 pypdf2 = "^3.0.1"
 
 
 [tool.poetry.group.research.dependencies]
 jupyter = "^1.1.1"
 notebook = "^7.2.2"
-
+torch = { version = "^2.7.0+cu128", source = "pytorch" }
 
 [tool.poetry.group.service.dependencies]
-fastapi = "^0.115.3"
+fastapi = "^0.115.9"
 requests = "^2.32.3"
 uvicorn = "^0.32.0"
 
@@ -37,7 +42,13 @@ ipykernel = "^6.29.5"
 
 [tool.poetry.group.web.dependencies]
 streamlit = "^1.39.0"
-pypdf = "^5.1.0"
+pypdf2 = "^3.0.1"
+
+
+[[tool.poetry.source]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu128"
+priority = "explicit"
 
 [build-system]
 requires = ["poetry-core"]

@@ -3,12 +3,18 @@
 # from selenium import webdriver
 # from selenium.webdriver.chrome.service import Service
 # from webdriver_manager.chrome import ChromeDriverManager
+import io
 import re
+import tempfile
+from typing import BinaryIO, Optional
 
+import pypdf
 from PyPDF2 import PdfReader
 
 
 class PDFToText:
+    """Utility class to extract text from PDF files."""
+
     def __init__(self, file):
         self.file = file
         self.reader = PdfReader(self.file)
@@ -24,64 +30,28 @@ class PDFToText:
 
         text = ""
         for page in self.reader.pages:
-            text += page.extract_text()
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n\n"
+
         return self._clean_resume_text(text)
 
     def _clean_resume_text(self, text: str) -> str:
-        """Clean and normalize text extracted from a resume PDF.
-
-        Handles common PDF parsing issues like:
-        - Broken words due to hyphenation
-        - Inconsistent spacing and line breaks
-        - Special characters and encoding issues
-        - Common PDF artifacts
-        - Multiple spaces and formatting issues
+        """Clean text by removing unnecessary whitespace and characters.
 
         Args:
-            text: Raw text extracted from PDF
+            text: Raw text from PDF
 
         Returns:
-            str: Cleaned and normalized text
+            str: Cleaned text
         """
-        if not text:
-            return ""
+        # Replace multiple spaces with a single space
+        text = re.sub(r"\s+", " ", text)
 
-        # Fix common encoding issues
-        text = text.encode("ascii", "ignore").decode("ascii")
+        # Replace multiple newlines with a single newline
+        text = re.sub(r"\n+", "\n", text)
 
-        # Fix hyphenated words split across lines
-        text = re.sub(r"(\w+)-\s*\n\s*(\w+)", r"\1\2", text)
-
-        # Replace various types of dashes/hyphens with standard dash
-        text = re.sub(r"[˗‐‑‒–—―]", "-", text)
-
-        # Replace multiple types of quotes with standard quotes
-        text = re.sub(r"[" "‛‚]", "'", text)
-        text = re.sub(r'[""‟„]', '"', text)
-
-        # Replace various whitespace characters with a single space
-        text = re.sub(
-            r"[\u00A0\u1680\u180E\u2000-\u200B\u202F\u205F\u3000\uFEFF]", " ", text
-        )
-
-        # Remove unwanted characters and symbols
-        text = re.sub(r"[<>\\|{}[\]~`]", "", text)
-
-        # Fix common PDF artifacts
-        text = re.sub(r"•", "", text)  # Remove bullet points
-        text = re.sub(r"©|®|™", "", text)  # Remove common symbols
-
-        # Normalize whitespace
-        text = re.sub(r"\s*\n\s*", "", text)  # Replace newlines with space
-        text = re.sub(r"\s+", " ", text)  # Replace multiple spaces with single space
-
-        # Fix common date formats (ensure consistent spacing)
-        text = re.sub(r"(\d{4})\s*/\s*(\d{4})", r"\1-\2", text)
-
-        # Remove extra spaces around punctuation
-        text = re.sub(r"\s+([.,!?;:])", r"\1", text)
-
-        # Final cleanup
+        # Remove leading/trailing whitespace
         text = text.strip()
 
         return text

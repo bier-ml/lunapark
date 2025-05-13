@@ -15,7 +15,7 @@ services:
     networks:
       - app
     container_name: frontend
-    profiles: ['dev', 'prod']
+    # profiles: ['dev', 'prod']
     
   backend:
     build:
@@ -24,9 +24,15 @@ services:
     ports:
       - 8000
     environment:
-      - LM_API_BASE_URL=${LM_API_BASE_URL:-http://host.docker.internal:5001/v1}
-      - RUNPOD_API_KEY=${RUNPOD_API_KEY:?RUNPOD_API_KEY is required}
-      - RUNPOD_ENDPOINT_URL=${RUNPOD_ENDPOINT_URL}
+      - LM_API_BASE_URL=${LM_API_BASE_URL:-http://host.docker.internal:1234/v1}
+      - RUNPOD_API_KEY=${RUNPOD_API_KEY:-}
+      - RUNPOD_ENDPOINT_URL=${RUNPOD_ENDPOINT_URL:-}
+      - LM_SEED=${LM_SEED:-42}
+      - LM_TEMPERATURE=${LM_TEMPERATURE:-0.0}
+      - NEO4J_URI=${NEO4J_URI:-bolt://neo4j:7687}
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-password}
+      
     env_file:
       - .env
     volumes:
@@ -35,22 +41,44 @@ services:
     networks:
       - app
     container_name: backend
-    profiles: ['dev', 'prod']
+    # profiles: ['dev', 'prod']
 
-  nginx:
-    image: nginx:alpine
+  # nginx:
+  #   image: nginx:alpine
+  #   ports:
+  #     - "8501:8501"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./nginx/.htpasswd:/etc/nginx/.htpasswd:ro
+  #   depends_on:
+  #     - frontend
+  #   profiles: ['prod']
+  #   networks:
+  #     - app
+  #   container_name: nginx
+    
+  neo4j:
+    image: neo4j:latest
     ports:
-      - "8501:8501"
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    environment:
+      - NEO4J_AUTH=${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-password}
+      - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/.htpasswd:/etc/nginx/.htpasswd:ro
-    depends_on:
-      - frontend
-    profiles: ['prod']
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_conf:/conf
     networks:
       - app
-    container_name: nginx
+    container_name: neo4j
+    # profiles: ['dev', 'prod']
 
 networks:
   app:
     driver: bridge
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  neo4j_conf:

@@ -35,7 +35,7 @@ If any category is missing, please respond with "Not specified" for that categor
 
     # Send the data to the model
     response = requests.post(
-        "http://localhost:5001/v1/chat/completions", json={"messages": messages}
+        "http://localhost:1234/v1/chat/completions", json={"messages": messages}
     )
     return extract_message(response, ["choices", 0, "message", "content"])
 
@@ -66,7 +66,7 @@ If any category is missing, please respond with "Not specified" for that categor
 
     # Send the data to the model
     response = requests.post(
-        "http://localhost:5001/v1/chat/completions", json={"messages": messages}
+        "http://localhost:1234/v1/chat/completions", json={"messages": messages}
     )
     return extract_message(response, ["choices", 0, "message", "content"])
 
@@ -126,7 +126,7 @@ for index, row in df.iterrows():
 
     # Send the data to the model
     response = requests.post(
-        "http://localhost:5001/v1/chat/completions", json={"messages": messages}
+        "http://localhost:1234/v1/chat/completions", json={"messages": messages}
     )
 
     # Extract the score from the final response

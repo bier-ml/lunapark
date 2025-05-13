@@ -1,6 +1,6 @@
 # CV-Vacancy Matcher
 
-A system for matching job candidates with vacancies using AI-powered analysis. The project consists of a FastAPI backend service and a Streamlit frontend application.
+A system for matching job candidates with vacancies using AI-powered analysis. The project consists of a FastAPI backend service, a Streamlit frontend application, and an LLM-based matching system.
 
 ## Design Documentation
 
@@ -19,15 +19,21 @@ For detailed information about the system architecture, components, and technica
 │   │   ├── models.py
 │   │   ├── test_api.py
 │   │   └── __init__.py
-│   └── platform/         # Core platform functionality
-│       ├── lm_predictor.py
-│       ├── prompts/
-│       └── ...
+│   ├── platform/         # Core platform functionality
+│   │   ├── lm_predictor.py
+│   │   ├── prompts/
+│   │   ├── rag/           # Retrieval-Augmented Generation components
+│   │   │   ├── airtable_loader.py 
+│   │   │   └── graph_rag_predictor.py
+│   │   ├── graph/         # Graph database components
+│   │   │   └── knowledge_graph.py
+│   │   └── ...
 ├── notebooks/           # Jupyter notebooks
-├── misc/               # Demo and example files
+├── misc/                # Demo and example files
 ├── poetry.lock
 ├── pyproject.toml
 ├── requirements.txt
+├── setup.py             # Package installation setup
 ├── Dockerfile.fastapi
 └── Dockerfile.streamlit
 ```
@@ -79,6 +85,49 @@ Watch the demo above to see the CV-Vacancy Matcher in action.
    ```
 
    The Streamlit interface will be available at `http://localhost:8501`
+
+### Graph RAG Pipeline
+
+The project includes a Graph RAG pipeline for more advanced matching between candidates and job vacancies.
+
+#### Components
+- **Neo4j**: Graph database for structured relationships between candidates, skills, locations, etc.
+- **Semantic Matching**: Uses sentence transformers to calculate semantic similarity
+- **Graph Matching**: Uses graph structures to find candidates based on skills, experience, location
+
+#### Setup
+
+1. **Neo4j Database**: We use a Neo4j container. You can start it with Docker Compose:
+   ```bash
+   docker-compose up neo4j
+   ```
+   Access Neo4j Browser at http://localhost:7474 (default credentials: neo4j/password)
+
+2. **Load Data from Airtable**:
+   ```bash
+   # Set environment variables or use .env file
+   export AIRTABLE_TOKEN=your_token
+   export AIRTABLE_BASE=your_base_id
+   export AIRTABLE_TABLE=your_table_id
+   
+   # Run the loader script
+   python -m src.platform.rag.load_airtable_data
+   ```
+
+#### Usage
+
+When making requests to the matching API, you can now select `graph_rag` as the predictor type:
+
+```json
+{
+  "candidate_description": "...",
+  "vacancy_description": "...",
+  "hr_comment": "",
+  "predictor_type": "graph_rag"
+}
+```
+
+The Graph RAG system combines vector similarity with graph-based matching to provide more accurate and explainable results.
 
 ## Development
 

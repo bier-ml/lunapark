@@ -7,7 +7,7 @@ in the candidate-position matching service.
 
 import os
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 class PredictorType(str, Enum):
     DUMMY = "dummy"
     LM = "lm"
+    GRAPH_RAG = "graph_rag"
     # Add more predictor types here as they are implemented
 
 
@@ -28,6 +29,16 @@ class PredictorParameters(BaseModel):
     )
     model: Optional[str] = Field(
         default=None, description="Model identifier to use for prediction"
+    )
+    temperature: Optional[float] = Field(
+        default=None,
+        description="Sampling temperature (0.0 to 1.0, lower = more deterministic)",
+        ge=0.0,
+        le=1.0,
+    )
+    seed: Optional[int] = Field(
+        default=None,
+        description="Random seed for deterministic outputs (overrides temperature for stability)",
     )
 
 
@@ -85,3 +96,38 @@ class CreatePodResponse(BaseModel):
     pod_id: str
     endpoint_url: str
     status: str
+
+
+class CandidateSearchRequest(BaseModel):
+    job_query: str = Field(
+        ..., description="Job description or search query", min_length=1
+    )
+    top_k: int = Field(
+        default=5, description="Number of candidates to return", ge=1, le=50
+    )
+    include_vector_search: bool = Field(
+        default=True, description="Whether to include vector similarity search"
+    )
+    include_graph_search: bool = Field(
+        default=True, description="Whether to include graph-based search"
+    )
+    min_skill_match: float = Field(
+        default=0.3,
+        description="Minimum ratio of matched skills (for graph search)",
+        ge=0.0,
+        le=1.0,
+    )
+    predictor_type: PredictorType = Field(
+        default=PredictorType.GRAPH_RAG,
+        description="The type of predictor to use for candidate search",
+    )
+    predictor_parameters: Optional[PredictorParameters] = Field(
+        default=None, description="Optional parameters for the predictor configuration"
+    )
+
+
+class CandidateSearchResponse(BaseModel):
+    candidates: List[Dict[str, Any]] = Field(
+        description="List of matching candidates with scores and details"
+    )
+    message: str = Field(description="Status message or error information")

@@ -15,17 +15,17 @@ class RunPodManager:
         runpod.api_key = self.api_key
 
         # Load configuration from environment variables with defaults
-        self.config = {
-            "min_vram_gb": int(os.getenv("RUNPOD_MIN_VRAM_GB", "16")),
-            "image": os.getenv("RUNPOD_IMAGE", "koboldai/koboldcpp:latest"),
-            "model_url": os.getenv("RUNPOD_DEFAULT_MODEL"),
-            "hf_token": os.getenv("HF_TOKEN"),
-            "port": os.getenv("RUNPOD_PORT", "5001"),
-            "cloud_type": os.getenv("RUNPOD_CLOUD_TYPE", "SECURE").upper(),
-            "context_size": os.getenv("KCPP_CONTEXT_SIZE", "4096"),
-            "gpu_layers": os.getenv("KCPP_GPU_LAYERS", "9999"),
-            "multi_user": os.getenv("KCPP_MULTI_USER", "20"),
-        }
+        # self.config = {
+        #     "min_vram_gb": int(os.getenv("RUNPOD_MIN_VRAM_GB", "16")),
+        #     "image": os.getenv("RUNPOD_IMAGE", "koboldai/koboldcpp:latest"),
+        #     "model_url": os.getenv("RUNPOD_DEFAULT_MODEL"),
+        #     "hf_token": os.getenv("HF_TOKEN"),
+        #     "port": os.getenv("RUNPOD_PORT", "5001"),
+        #     "cloud_type": os.getenv("RUNPOD_CLOUD_TYPE", "SECURE").upper(),
+        #     "context_size": os.getenv("KCPP_CONTEXT_SIZE", "4096"),
+        #     "gpu_layers": os.getenv("KCPP_GPU_LAYERS", "9999"),
+        #     "multi_user": os.getenv("KCPP_MULTI_USER", "20"),
+        # }
 
     def find_gpu(self) -> Optional[Dict]:
         """Find the cheapest suitable GPU."""
@@ -166,9 +166,11 @@ class RunPodManager:
             if response.status_code != 200 or not response.text.strip():
                 return {"is_ready": False}
 
+            # Set the environment variable for the current process
             os.environ["RUNPOD_ENDPOINT_URL"] = url
 
-            return {"is_ready": True}
+            # Return success with the endpoint URL for the client to use
+            return {"is_ready": True, "endpoint_url": url}
 
         except Exception as e:
             print(f"Failed to check endpoint status: {str(e)}")

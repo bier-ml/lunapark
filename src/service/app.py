@@ -6,9 +6,12 @@ from fastapi import FastAPI, HTTPException
 
 from src.platform.dummy_predictor import DummyPredictor
 from src.platform.lm_predictor import LMPredictor
+from src.platform.rag.graph_rag_predictor import GraphRAGPredictor
 from src.service.models import (
     AvailableModelsPerPredictorResponse,
     AvailableModelsResponse,
+    CandidateSearchRequest,
+    CandidateSearchResponse,
     CreatePodResponse,
     MatchRequest,
     MatchResponse,
@@ -33,7 +36,8 @@ except Exception as e:
 
 PREDICTOR_CLASSES = {
     "lm": LMPredictor,
-    "dummy": DummyPredictor,
+    # "dummy": DummyPredictor,
+    "graph_rag": GraphRAGPredictor,
 }
 
 
@@ -41,21 +45,41 @@ def get_predictor(
     predictor_type: str, parameters: Optional[PredictorParameters] = None
 ):
     """Create a predictor instance with given parameters or default configuration."""
-    if predictor_type == "dummy":
-        return DummyPredictor()
-    elif predictor_type == "lm":
-        # Get the endpoint URL from environment or parameters
-        api_base_url = (
-            parameters.api_base_url  # type: ignore
-            if parameters and parameters.api_base_url
-            else os.getenv("RUNPOD_ENDPOINT_URL") or os.getenv("LM_API_BASE_URL")
-        )
+    # if predictor_type == "dummy":
+    #     return DummyPredictor()
+    if predictor_type == "lm":
+        # Get the endpoint URL from parameters, or environment variables
+        # For production: use RUNPOD_ENDPOINT_URL if available
+        # For local development: use LM_API_BASE_URL with default http://localhost:1234/v1
+        api_base_url = None
+        if parameters and parameters.api_base_url:
+            api_base_url = parameters.api_base_url
+        elif os.getenv("RUNPOD_ENDPOINT_URL"):
+            # If RUNPOD_ENDPOINT_URL is set, we're in production mode with RunPod
+            api_base_url = os.getenv("RUNPOD_ENDPOINT_URL")
+        else:
+            # Default to local LLM
+            api_base_url = os.getenv("LM_API_BASE_URL", "http://localhost:1234/v1")
 
         if not api_base_url:
             raise HTTPException(
                 status_code=400,
                 detail="No LLM endpoint URL available. Please create a GPU pod first.",
             )
+
+        # Get temperature from parameters if provided
+        temperature = None
+        if parameters and parameters.temperature is not None:
+            temperature = parameters.temperature
+        else:
+            temperature = float(os.getenv("LM_TEMPERATURE", "0.1"))
+
+        # Get seed from parameters if provided
+        seed = None
+        if parameters and parameters.seed is not None:
+            seed = parameters.seed
+        else:
+            seed = int(os.getenv("LM_SEED", "42")) if os.getenv("LM_SEED") else None
 
         return LMPredictor(
             api_base_url=api_base_url,
@@ -65,6 +89,36 @@ def get_predictor(
             model=parameters.model
             if parameters
             else os.getenv("LM_MODEL", "QuantFactory/Meta-Llama-3-8B-GGUF"),  # type: ignore
+            temperature=temperature,
+            seed=seed,
+        )
+    elif predictor_type == "graph_rag":
+        # Get database connection settings from environment variables
+        neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        neo4j_user = os.getenv("NEO4J_USER", "neo4j")
+        neo4j_password = os.getenv("NEO4J_PASSWORD", "password")
+
+        # Get LLM settings (for enriching explanations)
+        api_base_url = os.getenv("LM_API_BASE_URL", "http://localhost:1234/v1")
+        api_key = os.getenv("LM_API_KEY", "not-needed")
+        model = os.getenv("LM_MODEL", "QuantFactory/Meta-Llama-3-8B-GGUF")
+
+        # Override with parameters if provided
+        if parameters:
+            if parameters.api_base_url:
+                api_base_url = parameters.api_base_url
+            if parameters.api_key:
+                api_key = parameters.api_key
+            if parameters.model:
+                model = parameters.model
+
+        return GraphRAGPredictor(
+            neo4j_uri=neo4j_uri,
+            neo4j_user=neo4j_user,
+            neo4j_password=neo4j_password,
+            lm_api_base_url=api_base_url,
+            lm_api_key=api_key,
+            lm_model=model,
         )
     return None
 
@@ -84,6 +138,10 @@ async def calculate_match(request: MatchRequest) -> MatchResponse:
                 score=0.0,
                 description=f"Unsupported predictor type: {request.predictor_type}",
             )
+
+        # Pass a fixed low temperature and fixed seed for deterministic results when using LM predictor
+        temperature = 0.0 if request.predictor_type == "lm" else None
+        seed = 42 if request.predictor_type == "lm" else None
 
         score, description = predictor.predict(
             request.candidate_description,
@@ -198,5 +256,238 @@ async def check_pod_endpoint(pod_id: str):
     return runpod_manager.check_endpoint_status(pod_id)
 
 
+@app.get("/debug/candidates")
+async def debug_candidates(job_query: str = "Data Scientist with PyTorch, Python, SQL"):
+    """Debug endpoint for candidate search functionality."""
+    print(f"Debug endpoint called with job_query: {job_query}")
+    try:
+        # Initialize the predictor
+        predictor = get_predictor("graph_rag")
+        if not predictor:
+            return {
+                "status": "error",
+                "message": "Failed to initialize GraphRAG predictor",
+            }
+
+        try:
+            # Count candidates and sample a few
+            with predictor.driver.session() as session:
+                result = session.run("MATCH (c:Candidate) RETURN count(c) as count")
+                candidate_count = result.single()["count"] if result.peek() else 0
+
+                result = session.run(
+                    "MATCH (c:Candidate) RETURN c.id as id, c.name as name LIMIT 3"
+                )
+                candidates = [
+                    {"id": record["id"], "name": record["name"]} for record in result
+                ]
+
+                result = session.run("MATCH (s:Skill) RETURN count(s) as count")
+                skills_count = result.single()["count"] if result.peek() else 0
+
+                # 1. Vector search
+                try:
+                    vector_results = predictor.score_candidates_vector(
+                        job_query, top_k=2
+                    )
+                except Exception as e:
+                    vector_results = {"error": str(e)}
+
+                # 2. Graph search
+                try:
+                    graph_results = predictor.score_candidates_graph(job_query, top_k=2)
+                except Exception as e:
+                    graph_results = {"error": str(e)}
+
+                return {
+                    "status": "success",
+                    "db_connection": "ok",
+                    "candidate_count": candidate_count,
+                    "candidates_sample": candidates,
+                    "skills_count": skills_count,
+                    "query": job_query,
+                    "extracted_components": predictor.extract_query_components(
+                        job_query
+                    ),
+                    "vector_search_results": vector_results,
+                    "graph_search_results": graph_results,
+                }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Neo4j connection error: {str(e)}",
+                "db_uri": predictor.neo4j_uri,
+                "db_user": predictor.neo4j_user,
+            }
+
+    except Exception as e:
+        return {"status": "error", "message": f"Debug error: {str(e)}"}
+
+
+@app.post(
+    "/search_candidates",
+    response_model=CandidateSearchResponse,
+    summary="Search for candidates matching a job description",
+    description="Find candidates that match the given job description or query based on skills, experience, and other factors",
+)
+async def search_candidates(request: CandidateSearchRequest) -> CandidateSearchResponse:
+    """Search for candidates matching a job description or query."""
+    print(f"Searching for candidates with query: {request.job_query[:50]}...")
+    try:
+        # Only graph_rag predictor supports candidate search
+        if request.predictor_type != "graph_rag":
+            return CandidateSearchResponse(
+                candidates=[],
+                message=f"Unsupported predictor type: {request.predictor_type}. Only 'graph_rag' supports candidate search.",
+            )
+
+        # Initialize the predictor
+        predictor = get_predictor(request.predictor_type, request.predictor_parameters)
+        if not predictor:
+            return CandidateSearchResponse(
+                candidates=[],
+                message=f"Failed to initialize predictor: {request.predictor_type}",
+            )
+
+        # Perform the search
+        # First extract components from the query if in natural language format
+        if (
+            request.job_query and len(request.job_query) > 30
+        ):  # Likely a full description
+            components = predictor.extract_query_components(request.job_query)
+            print(f"Extracted components: {components}")
+        else:
+            # Simple query, use as is
+            components = {
+                "role": request.job_query,
+                "location": "",
+                "years": 0.0,
+                "skills": [],
+            }
+            print(f"Using simple query components: {components}")
+
+        # Get candidates based on search parameters
+        candidates = []
+
+        if request.include_vector_search:
+            print("Performing vector search...")
+            # Perform vector similarity search
+            try:
+                vector_results = predictor.score_candidates_vector(
+                    request.job_query, top_k=request.top_k
+                )
+                print(f"Vector search found {len(vector_results)} candidates")
+                candidates.extend(vector_results)
+            except Exception as e:
+                print(f"Vector search failed: {str(e)}")
+                vector_results = []
+
+        if request.include_graph_search:
+            print("Performing graph search...")
+            # Perform graph-based search
+            try:
+                graph_results = predictor.score_candidates_graph(
+                    request.job_query, top_k=request.top_k
+                )
+                print(f"Graph search found {len(graph_results)} candidates")
+                # Add to candidates list
+                if graph_results:
+                    candidates.extend(graph_results)
+            except Exception as e:
+                print(f"Graph search failed: {str(e)}")
+                graph_results = []
+
+        print(f"Found a total of {len(candidates)} candidates from all search methods")
+
+        # If we have candidates from both sources, combine scores
+        final_candidates = []
+        if (
+            request.include_vector_search
+            and request.include_graph_search
+            and "vector_results" in locals()
+            and "graph_results" in locals()
+            and vector_results
+            and graph_results
+        ):
+            print("Combining scores from vector and graph search...")
+            combined_results = predictor.combine_scores(vector_results, graph_results)
+            final_candidates = combined_results
+        elif (
+            request.include_vector_search
+            and "vector_results" in locals()
+            and vector_results
+        ):
+            # Only vector search was enabled or successful
+            print("Using only vector search results...")
+            combined_results = predictor.combine_scores(vector_results, [])
+            final_candidates = combined_results
+        elif (
+            request.include_graph_search
+            and "graph_results" in locals()
+            and graph_results
+        ):
+            # Only graph search was enabled or successful
+            print("Using only graph search results...")
+            combined_results = predictor.combine_scores([], graph_results)
+            final_candidates = combined_results
+        else:
+            print("No results found from enabled search methods")
+            return CandidateSearchResponse(
+                candidates=[],
+                message="No matching candidates found with the selected search methods",
+            )
+
+        # Limit to top_k
+        final_candidates = final_candidates[: request.top_k]
+        print(f"Final candidates after filtering: {len(final_candidates)}")
+
+        # For each candidate, generate an analysis with pros and cons
+        for candidate in final_candidates:
+            # Extract candidate details from Neo4j if available
+            candidate_id = candidate.get("id")
+            if candidate_id:
+                try:
+                    # Get the explanation with pros and cons for this candidate
+                    explanation, pros_cons = predictor.generate_match_explanation(
+                        candidate_id=candidate_id,
+                        job_description=request.job_query,
+                        combined_score=candidate.get("combined_score", 0.0),
+                    )
+
+                    # Add to the result
+                    candidate["explanation"] = explanation
+                    candidate["pros_cons"] = pros_cons
+
+                    # Extract matched skills from graph matches if available
+                    graph_matches = candidate.get("graph_matches", [])
+                    matched_skills = []
+                    for match in graph_matches:
+                        if "skill" in match:
+                            skill_name = match.get("skill", {}).get("name")
+                            if skill_name and skill_name not in matched_skills:
+                                matched_skills.append(skill_name)
+
+                    candidate["matched_skills"] = matched_skills
+                except Exception as e:
+                    print(
+                        f"Error generating explanation for candidate {candidate_id}: {str(e)}"
+                    )
+                    candidate["explanation"] = "Failed to generate explanation."
+                    candidate["pros_cons"] = {"pros": [], "cons": []}
+                    candidate["matched_skills"] = []
+
+        return CandidateSearchResponse(
+            candidates=final_candidates,
+            message=f"Found {len(final_candidates)} matching candidates",
+        )
+
+    except Exception as e:
+        print(f"Candidate search error: {str(e)}")
+        return CandidateSearchResponse(
+            candidates=[], message=f"Failed to search candidates: {str(e)}"
+        )
+
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=1234)
