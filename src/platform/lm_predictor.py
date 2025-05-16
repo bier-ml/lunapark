@@ -1,11 +1,12 @@
 import os
-import re
 from typing import Optional, Tuple
-
+import re
 import requests
 
 from src.platform.base_predictor import BasePredictor
 from src.platform.prompts.simple_prompt import FEW_SHOT_EXAMPLES, PROMPT
+
+
 
 
 class LMPredictor(BasePredictor):
@@ -109,27 +110,24 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
         except Exception as e:
             # print(f"Unexpected error: {str(e, e.response.text)}")
             raise Exception(f"API call failed: {str(e, e.response.text)}")
-
     def parse_response(self, response: str):
         """Parse model response to extract thought and score"""
         # Try XML format first
         thought_match = re.search(r"<thought>(.*?)</thought>", response, re.DOTALL)
         if thought_match is None:
-            thought_match = re.search(
-                r"<thoughts>(.*?)</thoughts>", response, re.DOTALL
-            )
-
+            thought_match = re.search(r"<thoughts>(.*?)</thoughts>", response, re.DOTALL)
+            
         score_start = response.find("<score>")
         score_end = response.find("</score>")
         if score_start != -1 and score_end != -1:
-            score_content = response[score_start + len("<score>") : score_end].strip()
+            score_content = response[score_start + len("<score>"):score_end].strip()
             if "/" in score_content:
                 score_value = float(score_content.split("/")[0].strip())
             else:
                 score_value = float(score_content)
         else:
             score_value = None
-
+            
         if thought_match and score_value:
             thought = thought_match.group(1).strip()
             score = score_value
@@ -137,11 +135,10 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
             # Fall back to plain text format
             score_match = re.search(r"(\d+\.?\d*)/5", response)
             score = float(score_match.group(1)) if score_match else None
-
+            
             # Remove score from thought if present
             thought = re.sub(r"\d+\.?\d*/5", "", response).strip()
         return {"thought": thought, "score": score}
-
     def predict(
         self,
         candidate_description: str,
@@ -178,7 +175,7 @@ You are an advanced AI model designed to analyze the compatibility between a CV 
         try:
             response = self._call_api(prompt)
             result = self.parse_response(response)
-            return result["score"], result["thought"]
+            return result['score'], result['thought']
 
         except Exception as e:
             print("Error during prediction:", str(e))  # Log the error

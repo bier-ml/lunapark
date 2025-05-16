@@ -166,7 +166,7 @@ def display_results(score: float, description: Optional[str]) -> None:
         st.error(f"Match Score: {score}")
 
     # Display the score gauge
-    st.progress(score / 5)
+    st.progress(score/5)
 
     # Display analysis if available
     if description:
