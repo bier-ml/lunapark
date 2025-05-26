@@ -61,8 +61,8 @@ class VacancyManager:
         target_slice = self._get_middle_slice(target_vacancy)
         vacancies = self.retrieve_all_vacancies()
         for record_id, (vacancy, summarized_vacancy) in vacancies.items():
-            db_slice = self._get_middle_slice(vacancy)
-            if target_slice in db_slice or db_slice in target_slice:
+            normalized_record = self._normalize_text(vacancy)
+            if target_slice in normalized_record or normalized_record in target_slice:
                 return record_id, vacancy, summarized_vacancy
         return (None, None, None)
 

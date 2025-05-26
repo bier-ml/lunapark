@@ -61,8 +61,8 @@ class CVManager:
         target_slice = self._get_middle_slice(target_cv)
         cvs = self.retrieve_all_cvs()
         for record_id, (cv, summarized_cv) in cvs.items():
-            db_slice = self._get_middle_slice(cv)
-            if target_slice in db_slice or db_slice in target_slice:
+            normalized_cv = self._normalize_text(cv)
+            if target_slice in normalized_cv or normalized_cv in target_slice:
                 return record_id, cv, summarized_cv
         return (None, None, None)
 
