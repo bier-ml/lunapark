@@ -53,20 +53,6 @@ class CVManager:
         start = (total_length - length) // 2
         return normalized[start:start + length]
 
-    def find_unsummarized_cv(self, target_cv: str) -> Optional[Tuple[str, str]]:
-        """
-        Finds an unsummarized CV that matches the normalized middle portion of the input.
-        """
-        target_slice = self._get_middle_slice(target_cv)
-        cvs = self.retrieve_all_cvs()
-        for record_id, (cv, summarized) in cvs.items():
-            if summarized:
-                continue
-            db_slice = self._get_middle_slice(cv)
-            if target_slice in db_slice or db_slice in target_slice:
-                return record_id, cv
-        return None
-
     def find_cv(self, target_cv: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """
         Finds a CV that matches the normalized middle portion of the input.

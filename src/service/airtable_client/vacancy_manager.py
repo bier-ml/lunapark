@@ -53,20 +53,6 @@ class VacancyManager:
         start = (total_length - length) // 2
         return normalized[start:start + length]
     
-    def find_unsummarized_vacancy(self, target_vacancy: str) -> Optional[Tuple[str, str]]:
-        """
-        Finds an unsummarized vacancy that matches the normalized middle portion of the input.
-        """
-        target_slice = self._get_middle_slice(target_vacancy)
-        vacancies = self.retrieve_all_vacancies()
-        for record_id, (vacancy, summarized) in vacancies.items():
-            if summarized:
-                continue
-            db_slice = self._get_middle_slice(vacancy)
-            if target_slice in db_slice or db_slice in target_slice:
-                return record_id, vacancy
-        return None
-
     def find_vacancy(self, target_vacancy: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """
         Finds a vacancy that matches the normalized middle portion of the input.
