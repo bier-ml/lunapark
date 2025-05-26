@@ -1,10 +1,31 @@
+import re
 from typing import Dict, Tuple, Optional, Any
+import unicodedata
 from src.service.airtable_client.airtable_client import AirtableClient
 
 
 class VacancyManager:
     def __init__(self, airtable_client: AirtableClient):
         self.client = airtable_client
+
+    def _normalize_text(self, text: Optional[str]) -> str:
+        """
+        Normalize text by:
+        - Lowercasing
+        - Keeping only letters, digits, punctuation, and whitespace
+        - Stripping extra spaces
+        """
+        if not text:
+            return ""
+        text = unicodedata.normalize("NFKD", text)
+        text = text.lower()
+        # Keep only letters, numbers, punctuation, and whitespace
+        text = ''.join(
+            ch for ch in text
+            if unicodedata.category(ch).startswith(('L', 'N', 'P', 'Z'))
+        )
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
 
     def retrieve_all_vacancies(self) -> Dict[str, Tuple[str, str]]:
         """

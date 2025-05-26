@@ -12,14 +12,18 @@ class CVManager:
         """
         Normalize text by:
         - Lowercasing
-        - Removing non-letter/punctuation characters
+        - Keeping only letters, digits, punctuation, and whitespace
         - Stripping extra spaces
         """
         if not text:
             return ""
         text = unicodedata.normalize("NFKD", text)
         text = text.lower()
-        text = re.sub(r"[^\w\s\p{P}]", "", text, flags=re.UNICODE)  # Keep letters, digits, punctuation
+        # Keep only letters, numbers, punctuation, and whitespace
+        text = ''.join(
+            ch for ch in text
+            if unicodedata.category(ch).startswith(('L', 'N', 'P', 'Z'))
+        )
         text = re.sub(r"\s+", " ", text).strip()
         return text
 

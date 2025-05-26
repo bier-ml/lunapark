@@ -1,6 +1,7 @@
 import os
 from typing import Optional
 
+from dotenv import load_dotenv
 import uvicorn
 from fastapi import FastAPI, HTTPException
 
@@ -19,6 +20,8 @@ from src.service.models import (
     PredictorParameters,
     PredictorType,
 )
+
+load_dotenv()
 
 app = FastAPI(
     title="Candidate Scoring API",
