@@ -11,6 +11,7 @@ from src.platform.lm_predictor import LMPredictor
 from src.platform.vacancy_summarizer import VacancySummarizer
 from src.service.airtable_client.airtable_client import AirtableClient
 from src.service.airtable_client.cv_manager import CVManager
+from src.service.airtable_client.pair_manager import PairManager
 from src.service.airtable_client.vacancy_manager import VacancyManager
 from src.service.models import (
     AvailableModelsPerPredictorResponse,
@@ -44,8 +45,15 @@ vacancy_airtable_client = AirtableClient(
     table_id="tblfVZLqyJjb2SVHW",
 )
 
+pair_airtable_client = AirtableClient(
+    api_key=os.getenv("AIRTABLE_API_KEY"),
+    base_id="appPa8VJ4IHfm1V5O",
+    table_id="tblUcFbuuWyTGABq6",
+)
+
 cv_manager = CVManager(airtable_client=cv_airtable_client)
 vacancy_manager = VacancyManager(airtable_client=vacancy_airtable_client)
+pair_manager = PairManager(airtable_client=pair_airtable_client)
 
 PREDICTOR_CLASSES = {
     "lm": LMPredictor,
@@ -92,7 +100,15 @@ async def calculate_match(request: MatchRequest) -> MatchResponse:
         )
     
     requested_cv = request.candidate_description
+    requested_vacancy = request.vacancy_description
+
     cv_id, cv_record, summarized_cv = cv_manager.find_cv(requested_cv)
+    vacancy_id, vacancy_record, summarized_vacancy = vacancy_manager.find_vacancy(requested_vacancy)
+
+    existing_pair = pair_manager.get_pair_result(cv_id, vacancy_id)
+    if existing_pair:
+        return MatchResponse(score=existing_pair["score"], description=existing_pair["comment"])
+    
     if not cv_id:
         # If CV is not found, create a new record
         summarized_cv = cv_summarizer.summarize(requested_cv)
@@ -102,8 +118,6 @@ async def calculate_match(request: MatchRequest) -> MatchResponse:
         summarized_cv = cv_summarizer.summarize(cv_record)
         cv_manager.update_cv((cv_id, cv_record), summarized_cv)
 
-    requested_vacancy = request.vacancy_description
-    vacancy_id, vacancy_record, summarized_vacancy = vacancy_manager.find_vacancy(requested_vacancy)
     if not vacancy_id:
         # If vacancy is not found, create a new record
         summarized_vacancy = vacancy_summarizer.summarize(requested_vacancy)
@@ -116,11 +130,12 @@ async def calculate_match(request: MatchRequest) -> MatchResponse:
     print(f"Summarized CV: {summarized_cv}")
     print("==" * 20)
     print(f"Summarized Vacancy: {summarized_vacancy}")
-    score, description = predictor.predict(
+    score, comment = predictor.predict(
         summarized_cv, summarized_vacancy, request.hr_comment
     )
+    pair_manager.save_pair_result(cv_id, vacancy_id, comment, score)
 
-    return MatchResponse(score=score, description=description)
+    return MatchResponse(score=score, description=comment)
 
 
 @app.get(
