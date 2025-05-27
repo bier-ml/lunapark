@@ -127,9 +127,6 @@ async def calculate_match(request: MatchRequest) -> MatchResponse:
         summarized_vacancy = vacancy_summarizer.summarize(vacancy_record)
         vacancy_manager.update_vacancy((vacancy_id, vacancy_record), summarized_vacancy)
 
-    print(f"Summarized CV: {summarized_cv}")
-    print("==" * 20)
-    print(f"Summarized Vacancy: {summarized_vacancy}")
     score, comment = predictor.predict(
         summarized_cv, summarized_vacancy, request.hr_comment
     )
