@@ -19,31 +19,18 @@ neo4j = "^5.28.1"
 sentence-transformers = "^4.1.0"
 neo4j-graphrag = "^1.7.0"
 pypdf2 = "^3.0.1"
-
-
-[tool.poetry.group.research.dependencies]
 jupyter = "^1.1.1"
 notebook = "^7.2.2"
 torch = { version = "^2.7.0+cu128", source = "pytorch" }
-
-[tool.poetry.group.service.dependencies]
 fastapi = "^0.115.9"
 requests = "^2.32.3"
 uvicorn = "^0.32.0"
-
-
-[tool.poetry.group.dev.dependencies]
 pre-commit = "^4.0.1"
 ruff = "^0.7.1"
 isort = "^5.13.2"
 mypy = "^1.13.0"
 ipykernel = "^6.29.5"
-
-
-[tool.poetry.group.web.dependencies]
 streamlit = "^1.39.0"
-pypdf2 = "^3.0.1"
-
 
 [[tool.poetry.source]]
 name = "pytorch"
