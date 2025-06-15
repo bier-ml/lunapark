@@ -1,11 +1,18 @@
 import os
 from typing import Optional
 
+from dotenv import load_dotenv
 import uvicorn
 from fastapi import FastAPI, HTTPException
 
+from src.platform.cv_summarizer import CVSummarizer
 from src.platform.dummy_predictor import DummyPredictor
 from src.platform.lm_predictor import LMPredictor
+from src.platform.vacancy_summarizer import VacancySummarizer
+from src.service.airtable_client.airtable_client import AirtableClient
+from src.service.airtable_client.cv_manager import CVManager
+from src.service.airtable_client.pair_manager import PairManager
+from src.service.airtable_client.vacancy_manager import VacancyManager
 from src.service.models import (
     AvailableModelsPerPredictorResponse,
     AvailableModelsResponse,
@@ -17,12 +24,71 @@ from src.service.models import (
 )
 from src.service.runpod import RunPodManager
 
+load_dotenv()
+
 app = FastAPI(
     title="Candidate Scoring API",
     description="API for predicting candidate match scores for positions",
     version="1.0.0",
 )
 
+cv_summarizer = CVSummarizer(model="lmstudio-community/gemma-2-9b-it-GGUF")
+vacancy_summarizer = VacancySummarizer(model="lmstudio-community/gemma-2-9b-it-GGUF")
+
+cv_airtable_client = AirtableClient(
+    api_key=os.getenv("AIRTABLE_API_KEY"),
+    base_id=os.getenv("AIRTABLE_BASE_ID"),
+    table_id=os.getenv("AIRTABLE_CV_TABLE_ID"),
+)
+
+vacancy_airtable_client = AirtableClient(
+    api_key=os.getenv("AIRTABLE_API_KEY"),
+    base_id=os.getenv("AIRTABLE_BASE_ID"),
+    table_id=os.getenv("AIRTABLE_VACANCY_TABLE_ID"),
+)
+
+pair_airtable_client = AirtableClient(
+    api_key=os.getenv("AIRTABLE_API_KEY"),
+    base_id=os.getenv("AIRTABLE_BASE_ID"),
+    table_id=os.getenv("AIRTABLE_PAIR_TABLE_ID"),
+)
+
+cv_manager = CVManager(airtable_client=cv_airtable_client)
+vacancy_manager = VacancyManager(airtable_client=vacancy_airtable_client)
+pair_manager = PairManager(airtable_client=pair_airtable_client)
+
+cv_summarizer = CVSummarizer(model="lmstudio-community/gemma-2-9b-it-GGUF")
+vacancy_summarizer = VacancySummarizer(model="lmstudio-community/gemma-2-9b-it-GGUF")
+
+cv_airtable_client = AirtableClient(
+    api_key=os.getenv("AIRTABLE_API_KEY"),
+    base_id=os.getenv("AIRTABLE_BASE_ID"),
+    table_id=os.getenv("AIRTABLE_CV_TABLE_ID"),
+)
+
+vacancy_airtable_client = AirtableClient(
+    api_key=os.getenv("AIRTABLE_API_KEY"),
+    base_id=os.getenv("AIRTABLE_BASE_ID"),
+    table_id=os.getenv("AIRTABLE_VACANCY_TABLE_ID"),
+)
+
+pair_airtable_client = AirtableClient(
+    api_key=os.getenv("AIRTABLE_API_KEY"),
+    base_id=os.getenv("AIRTABLE_BASE_ID"),
+    table_id=os.getenv("AIRTABLE_PAIR_TABLE_ID"),
+)
+
+cv_manager = CVManager(airtable_client=cv_airtable_client)
+vacancy_manager = VacancyManager(airtable_client=vacancy_airtable_client)
+pair_manager = PairManager(airtable_client=pair_airtable_client)
+
+
+# Initialize RunPod manager as a global variable, but with proper error handling
+try:
+    runpod_manager = RunPodManager()
+except Exception as e:
+    print(f"Warning: Failed to initialize RunPod manager: {str(e)}")
+    runpod_manager = None
 
 # Initialize RunPod manager as a global variable, but with proper error handling
 try:
@@ -77,33 +143,47 @@ def get_predictor(
 )
 async def calculate_match(request: MatchRequest) -> MatchResponse:
     """Calculate match score between vacancy and candidate."""
-    try:
-        predictor = get_predictor(request.predictor_type, request.predictor_parameters)
-        if not predictor:
-            return MatchResponse(
-                score=0.0,
-                description=f"Unsupported predictor type: {request.predictor_type}",
-            )
-
-        score, description = predictor.predict(
-            request.candidate_description,
-            request.vacancy_description,
-            request.hr_comment,
+    predictor = get_predictor(request.predictor_type, request.predictor_parameters)
+    if not predictor:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported predictor type: {request.predictor_type}",
         )
+    
+    requested_cv = request.candidate_description
+    requested_vacancy = request.vacancy_description
 
-        # Ensure we have valid values
-        if score is None:
-            score = 0.0
-        if not description:
-            description = "No explanation available"
+    cv_id, cv_record, summarized_cv = cv_manager.find_cv(requested_cv)
+    vacancy_id, vacancy_record, summarized_vacancy = vacancy_manager.find_vacancy(requested_vacancy)
 
-        return MatchResponse(score=float(score), description=description)
+    existing_pair = pair_manager.get_pair_result(cv_id, vacancy_id)
+    if existing_pair:
+        return MatchResponse(score=existing_pair["score"], description=existing_pair["comment"])
+    
+    if not cv_id:
+        # If CV is not found, create a new record
+        summarized_cv = cv_summarizer.summarize(requested_cv)
+        cv_id = cv_manager.create_cv(requested_cv, summarized_cv)
+    elif not summarized_cv:
+        # If CV is found but not summarized, summarize it
+        summarized_cv = cv_summarizer.summarize(cv_record)
+        cv_manager.update_cv((cv_id, cv_record), summarized_cv)
 
-    except Exception as e:
-        print(f"Match calculation error: {str(e)}")
-        return MatchResponse(
-            score=0.0, description=f"Failed to calculate match: {str(e)}"
-        )
+    if not vacancy_id:
+        # If vacancy is not found, create a new record
+        summarized_vacancy = vacancy_summarizer.summarize(requested_vacancy)
+        vacancy_id = vacancy_manager.create_vacancy(requested_vacancy, summarized_vacancy)
+    elif not summarized_vacancy:
+        # If vacancy is found but not summarized, summarize it
+        summarized_vacancy = vacancy_summarizer.summarize(vacancy_record)
+        vacancy_manager.update_vacancy((vacancy_id, vacancy_record), summarized_vacancy)
+
+    score, comment = predictor.predict(
+        summarized_cv, summarized_vacancy, request.hr_comment
+    )
+    pair_manager.save_pair_result(cv_id, vacancy_id, comment, score)
+
+    return MatchResponse(score=score, description=comment)
 
 
 @app.get(
