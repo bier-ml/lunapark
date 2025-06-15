@@ -35,20 +35,20 @@ vacancy_summarizer = VacancySummarizer(model="lmstudio-community/gemma-2-9b-it-G
 
 cv_airtable_client = AirtableClient(
     api_key=os.getenv("AIRTABLE_API_KEY"),
-    base_id="appPa8VJ4IHfm1V5O",
-    table_id="tblF1QERP6FFNMnM1",
+    base_id=os.getenv("AIRTABLE_BASE_ID"),
+    table_id=os.getenv("AIRTABLE_CV_TABLE_ID"),
 )
 
 vacancy_airtable_client = AirtableClient(
     api_key=os.getenv("AIRTABLE_API_KEY"),
-    base_id="appPa8VJ4IHfm1V5O",
-    table_id="tblfVZLqyJjb2SVHW",
+    base_id=os.getenv("AIRTABLE_BASE_ID"),
+    table_id=os.getenv("AIRTABLE_VACANCY_TABLE_ID"),
 )
 
 pair_airtable_client = AirtableClient(
     api_key=os.getenv("AIRTABLE_API_KEY"),
-    base_id="appPa8VJ4IHfm1V5O",
-    table_id="tblUcFbuuWyTGABq6",
+    base_id=os.getenv("AIRTABLE_BASE_ID"),
+    table_id=os.getenv("AIRTABLE_PAIR_TABLE_ID"),
 )
 
 cv_manager = CVManager(airtable_client=cv_airtable_client)
