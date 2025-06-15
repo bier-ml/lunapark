@@ -20,7 +20,7 @@ class PredictorType(str, Enum):
 
 class PredictorParameters(BaseModel):
     api_base_url: Optional[str] = Field(
-        default=os.getenv("LM_API_BASE_URL", "http://localhost:5001/v1"),
+        default=os.getenv("RUNPOD_ENDPOINT_URL", os.getenv("LM_API_BASE_URL")),
         description="Base URL for the language model API",
     )
     api_key: Optional[str] = Field(
@@ -79,3 +79,9 @@ class AvailableModelsPerPredictorResponse(BaseModel):
     models: Dict[PredictorType, List[str]] = Field(
         description="Dictionary mapping predictor types to their available models"
     )
+
+
+class CreatePodResponse(BaseModel):
+    pod_id: str
+    endpoint_url: str
+    status: str
