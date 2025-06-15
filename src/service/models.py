@@ -30,16 +30,6 @@ class PredictorParameters(BaseModel):
     model: Optional[str] = Field(
         default=None, description="Model identifier to use for prediction"
     )
-    temperature: Optional[float] = Field(
-        default=None,
-        description="Sampling temperature (0.0 to 1.0, lower = more deterministic)",
-        ge=0.0,
-        le=1.0,
-    )
-    seed: Optional[int] = Field(
-        default=None,
-        description="Random seed for deterministic outputs (overrides temperature for stability)",
-    )
 
 
 class MatchRequest(BaseModel):
