@@ -15,7 +15,6 @@ services:
     networks:
       - app
     container_name: frontend
-    profiles: ['dev', 'prod']
     
   backend:
     build:
@@ -35,18 +34,16 @@ services:
     networks:
       - app
     container_name: backend
-    profiles: ['dev', 'prod']
 
   nginx:
     image: nginx:alpine
     ports:
-      - "8501:8501"
+      - "8503:8503"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/.htpasswd:/etc/nginx/.htpasswd:ro
     depends_on:
       - frontend
-    profiles: ['prod']
     networks:
       - app
     container_name: nginx
