@@ -49,10 +49,9 @@ The current pipeline's manual nature makes it fundamentally unscalable as the co
 1. Automated Resume Processing
    - Parse multiple document formats (PDF, DOCX, *LinkedIn profile*).
    - Extract relevant information about the candidate automatically.
-   - Handle multilingual resumes (English, Russian, Ukranian).
+   - Handle multilingual resumes (English, Russian).
 
 2. Intelligent Matching
-   - Match candidates to job requirements.
    - Score candidates based on skills and experience needed for the particular vacancy.
    - Provide explainable results in natural language.
    - Process all data using locally deployed open-source models only, as sending candidate PII to third-party LLM services (like OpenAI) is prohibited for data privacy reasons.
