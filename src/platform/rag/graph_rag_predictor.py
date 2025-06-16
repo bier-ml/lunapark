@@ -19,6 +19,34 @@ from src.platform.rag.resume_parser import ResumeParser
 class GraphRAGPredictor(BasePredictor):
     """
     Graph RAG-based predictor that uses Neo4j GraphRAG for job-candidate matching.
+    
+    IMPROVED SCORING PIPELINE:
+    
+    1. Enhanced Query Analysis:
+       - Extracts seniority level (junior/mid/senior) from job descriptions
+       - Identifies priority skills (required, must-have, essential)
+       - Better role and experience requirement parsing
+    
+    2. Context-Aware Vector Scoring:
+       - Normalizes vector similarity scores based on query context
+       - Penalizes suspiciously high scores (potential duplicates)
+       - Adjusts thresholds based on seniority level and technical complexity
+    
+    3. Improved Graph Scoring:
+       - Advanced skill matching with synonyms and fuzzy matching
+       - Weighted scoring for priority vs. regular skills
+       - Seniority-aware experience evaluation
+       - Adaptive component weights based on query characteristics
+    
+    4. Intelligent Score Combination:
+       - Quality assessment for both vector and graph scores
+       - Adaptive weighting based on score reliability and data richness
+       - Final ranking adjustments for priority skill matches
+    
+    5. Better Score Interpretation:
+       - Scores now better reflect actual candidate relevance
+       - Reduced false positives from high but irrelevant similarity
+       - Improved ranking for candidates with balanced skill/experience profiles
     """
 
     def __init__(
@@ -118,53 +146,20 @@ class GraphRAGPredictor(BasePredictor):
         # Handle very short queries
         if len(query) < 10:
             # Simple handling - assume the whole thing is the role
-            return {"role": query, "skills": [], "location": "", "years": 0}
+            return {"role": query, "skills": [], "location": "", "years": 0, "seniority": "mid", "priority_skills": []}
 
         try:
             # First try a direct skills extraction by keyword matching
             skills = []
+            priority_skills = []  # Skills that are explicitly emphasized
 
             # Common programming languages and technologies to explicitly check for
             common_skills = [
-                "python",
-                "java",
-                "javascript",
-                "typescript",
-                "c++",
-                "c#",
-                "ruby",
-                "go",
-                "rust",
-                "sql",
-                "postgresql",
-                "mysql",
-                "mongodb",
-                "redis",
-                "react",
-                "angular",
-                "vue",
-                "node.js",
-                "django",
-                "flask",
-                "spring",
-                "kubernetes",
-                "docker",
-                "aws",
-                "azure",
-                "gcp",
-                "machine learning",
-                "ai",
-                "pytorch",
-                "tensorflow",
-                "figma",
-                "sketch",
-                "photoshop",
-                "illustrator",
-                "css",
-                "html",
-                "git",
-                "devops",
-                "cicd",
+                "python", "java", "javascript", "typescript", "c++", "c#", "ruby", "go", "rust",
+                "sql", "postgresql", "mysql", "mongodb", "redis", "react", "angular", "vue",
+                "node.js", "django", "flask", "spring", "kubernetes", "docker", "aws", "azure", "gcp",
+                "machine learning", "ai", "pytorch", "tensorflow", "figma", "sketch", "photoshop",
+                "illustrator", "css", "html", "git", "devops", "cicd", "jenkins", "terraform"
             ]
 
             # Check for these skills in the query
@@ -172,11 +167,18 @@ class GraphRAGPredictor(BasePredictor):
             for skill in common_skills:
                 if skill in query_lower:
                     skills.append(skill)
+                    # Check if skill is emphasized (required, must have, essential, etc.)
+                    skill_context = self._get_skill_context(query_lower, skill)
+                    if any(keyword in skill_context for keyword in ["required", "must", "essential", "critical", "mandatory"]):
+                        priority_skills.append(skill)
 
-            # Extract role from query - first try simple keyword pattern matching
+            # Extract role and seniority level
             role = ""
+            seniority = "mid"  # default
+            
+            # Enhanced role patterns with seniority detection
             role_patterns = [
-                r"(senior|junior|lead|principal)?\s*(software|frontend|backend|fullstack|full-stack|data|ml|ai|devops|cloud|mobile|web|ios|android|system)?\s*(developer|engineer|architect|designer|scientist)"
+                r"(senior|sr\.?|lead|principal|staff|chief|head of|director of)?\s*(software|frontend|backend|fullstack|full-stack|data|ml|ai|devops|cloud|mobile|web|ios|android|system)?\s*(developer|engineer|architect|designer|scientist|analyst)"
             ]
 
             for pattern in role_patterns:
@@ -185,6 +187,16 @@ class GraphRAGPredictor(BasePredictor):
                     # Take the first match and join its components
                     role_parts = [part for part in matches[0] if part]
                     role = " ".join(role_parts)
+                    
+                    # Determine seniority level
+                    seniority_indicators = matches[0][0] if matches[0] else ""
+                    if any(level in seniority_indicators for level in ["senior", "sr", "lead", "principal", "staff", "chief", "head", "director"]):
+                        if any(level in seniority_indicators for level in ["principal", "staff", "chief", "head", "director"]):
+                            seniority = "senior"
+                        else:
+                            seniority = "senior"
+                    elif "junior" in seniority_indicators or "jr" in seniority_indicators:
+                        seniority = "junior"
                     break
 
             # Extract years of experience if mentioned
@@ -201,6 +213,12 @@ class GraphRAGPredictor(BasePredictor):
                     try:
                         # Extract the first number found
                         years = float(matches[0][0])
+                        # Adjust seniority based on years if not already determined
+                        if seniority == "mid":
+                            if years >= 7:
+                                seniority = "senior"
+                            elif years <= 2:
+                                seniority = "junior"
                         break
                     except (ValueError, IndexError):
                         pass
@@ -219,23 +237,18 @@ class GraphRAGPredictor(BasePredictor):
                     location = matches[0][0]
                     break
 
-            # Use LLM only for complex queries or if simple extraction failed
-            if not skills and not role and len(query) > 50:
-                # Add a fallback to LLM extraction if needed
-                pass
-
             # Ensure we at least have some minimal data
             if not role and len(query.split()) < 5:
-                role = (
-                    query  # Use the whole query if it's short and no role was detected
-                )
+                role = query  # Use the whole query if it's short and no role was detected
 
             # Combine results
             components = {
                 "role": role,
                 "skills": skills,
+                "priority_skills": priority_skills,
                 "location": location,
                 "years": years,
+                "seniority": seniority,
             }
 
             print(f"Extracted components: {components}")
@@ -244,7 +257,184 @@ class GraphRAGPredictor(BasePredictor):
         except Exception as e:
             print(f"Error extracting query components: {str(e)}")
             # Return empty values on error
-            return {"role": "", "skills": [], "location": "", "years": 0}
+            return {"role": "", "skills": [], "priority_skills": [], "location": "", "years": 0, "seniority": "mid"}
+
+    def _get_skill_context(self, text: str, skill: str) -> str:
+        """Extract context around a skill mention to determine its importance."""
+        skill_index = text.find(skill)
+        if skill_index == -1:
+            return ""
+        
+        # Get 50 characters before and after the skill mention
+        start = max(0, skill_index - 50)
+        end = min(len(text), skill_index + len(skill) + 50)
+        return text[start:end]
+
+    def _normalize_vector_score(self, score: float, query_context: Dict) -> float:
+        """
+        Normalize vector similarity score based on query context and score quality.
+        
+        Args:
+            score: Raw vector similarity score (0-1)
+            query_context: Query components for context-aware normalization
+            
+        Returns:
+            Normalized score (0-1)
+        """
+        if score <= 0:
+            return 0.0
+            
+        # Apply context-aware normalization
+        normalized_score = score
+        
+        # Penalize very high scores that might be false positives
+        if score > 0.95:
+            # Very high similarity might indicate duplicate or near-duplicate content
+            # rather than genuine job relevance
+            normalized_score = score * 0.9
+            
+        # Boost scores for queries with specific technical requirements
+        if query_context.get("skills") and len(query_context["skills"]) > 3:
+            # Complex technical queries should have higher confidence in vector matching
+            normalized_score = min(1.0, normalized_score * 1.1)
+            
+        # Apply seniority-based adjustments
+        seniority = query_context.get("seniority", "mid")
+        if seniority == "senior" and score < 0.7:
+            # Senior roles require higher similarity thresholds
+            normalized_score = score * 0.8
+        elif seniority == "junior" and score > 0.6:
+            # Junior roles can be more flexible
+            normalized_score = min(1.0, score * 1.2)
+            
+        return max(0.0, min(1.0, normalized_score))
+
+    def _calculate_skill_relevance_score(self, candidate_skills: List[str], query_components: Dict) -> Tuple[float, List[str], Dict]:
+        """
+        Calculate skill relevance score with improved matching and weighting.
+        
+        Args:
+            candidate_skills: List of candidate's skills
+            query_components: Extracted query components
+            
+        Returns:
+            Tuple of (skill_score, matched_skills, skill_details)
+        """
+        query_skills = query_components.get("skills", [])
+        priority_skills = query_components.get("priority_skills", [])
+        query_role = query_components.get("role", "").lower()
+        seniority = query_components.get("seniority", "mid")
+        
+        if not query_skills and not query_role:
+            return 0.0, [], {}
+            
+        matched_skills = []
+        priority_matches = []
+        skill_details = {}
+        
+        # Enhanced skill matching with fuzzy matching and synonyms
+        skill_synonyms = {
+            "javascript": ["js", "ecmascript", "node.js", "nodejs"],
+            "python": ["py", "python3"],
+            "sql": ["database", "postgresql", "mysql", "sqlite", "oracle"],
+            "react": ["reactjs", "react.js"],
+            "angular": ["angularjs", "angular.js"],
+            "machine learning": ["ml", "ai", "artificial intelligence", "deep learning"],
+            "devops": ["ci/cd", "cicd", "deployment", "infrastructure"],
+        }
+        
+        for candidate_skill in candidate_skills:
+            if not isinstance(candidate_skill, str):
+                continue
+                
+            candidate_skill_lower = candidate_skill.lower()
+            best_match_score = 0.0
+            matched_query_skill = None
+            is_priority = False
+            
+            # Direct matching against query skills
+            for query_skill in query_skills:
+                if not isinstance(query_skill, str):
+                    continue
+                    
+                query_skill_lower = query_skill.lower()
+                match_score = 0.0
+                
+                # Exact match
+                if query_skill_lower == candidate_skill_lower:
+                    match_score = 1.0
+                # Substring match
+                elif query_skill_lower in candidate_skill_lower or candidate_skill_lower in query_skill_lower:
+                    match_score = 0.8
+                # Synonym match
+                elif query_skill_lower in skill_synonyms:
+                    if any(syn in candidate_skill_lower for syn in skill_synonyms[query_skill_lower]):
+                        match_score = 0.9
+                # Check reverse synonyms
+                else:
+                    for main_skill, synonyms in skill_synonyms.items():
+                        if candidate_skill_lower in synonyms and main_skill == query_skill_lower:
+                            match_score = 0.9
+                            break
+                
+                if match_score > best_match_score:
+                    best_match_score = match_score
+                    matched_query_skill = query_skill
+                    is_priority = query_skill in priority_skills
+            
+            # Role-based matching if no specific skills in query
+            if best_match_score == 0.0 and query_role:
+                role_keywords = query_role.split()
+                for keyword in role_keywords:
+                    if keyword in candidate_skill_lower:
+                        best_match_score = 0.6  # Lower score for role-based matches
+                        matched_query_skill = f"role:{keyword}"
+                        break
+            
+            if best_match_score > 0.5:  # Threshold for considering a match
+                matched_skills.append(candidate_skill)
+                if is_priority:
+                    priority_matches.append(candidate_skill)
+                    
+                skill_details[candidate_skill] = {
+                    "match_score": best_match_score,
+                    "matched_query_skill": matched_query_skill,
+                    "is_priority": is_priority
+                }
+        
+        # Calculate overall skill score
+        if not query_skills:
+            # Role-based scoring
+            skill_score = min(len(matched_skills) / 3, 0.8) if matched_skills else 0.0
+        else:
+            # Calculate weighted score based on matches
+            total_weight = 0.0
+            achieved_weight = 0.0
+            
+            for query_skill in query_skills:
+                weight = 2.0 if query_skill in priority_skills else 1.0
+                total_weight += weight
+                
+                # Find best matching candidate skill for this query skill
+                best_candidate_match = 0.0
+                for candidate_skill, details in skill_details.items():
+                    if details["matched_query_skill"] == query_skill:
+                        best_candidate_match = max(best_candidate_match, details["match_score"])
+                
+                achieved_weight += weight * best_candidate_match
+            
+            skill_score = achieved_weight / total_weight if total_weight > 0 else 0.0
+            
+            # Apply seniority adjustments
+            if seniority == "senior":
+                # Senior roles require higher skill coverage
+                if skill_score < 0.7:
+                    skill_score *= 0.8
+            elif seniority == "junior":
+                # Junior roles can be more flexible
+                skill_score = min(1.0, skill_score * 1.2)
+        
+        return skill_score, matched_skills, skill_details
 
     def score_candidates_vector(self, query: str, top_k: int = 10) -> List[Dict]:
         """
@@ -259,6 +449,9 @@ class GraphRAGPredictor(BasePredictor):
         """
         try:
             print(f"Performing vector search for query: '{query}'")
+            
+            # Extract query components for context-aware normalization
+            query_components = self.extract_query_components(query)
 
             # Create query embedding
             query_embedding = self.embedder.embed_query(query)
@@ -313,30 +506,41 @@ class GraphRAGPredictor(BasePredictor):
                         cypher_query = """
                         MATCH (c:Candidate)
                         WHERE c.embedding IS NOT NULL
-                        WITH c, vectorSimilarity(c.embedding, $query_embedding) AS score
-                        RETURN c.id AS id, c.name AS name, score
-                        ORDER BY score DESC
+                        WITH c, vectorSimilarity(c.embedding, $query_embedding) AS raw_score
+                        RETURN c.id AS id, c.name AS name, raw_score
+                        ORDER BY raw_score DESC
                         LIMIT $limit
                         """
 
                         result = session.run(
-                            cypher_query, query_embedding=query_embedding, limit=top_k
+                            cypher_query, query_embedding=query_embedding, limit=top_k * 2  # Get more for filtering
                         )
 
                         candidates = []
                         for record in result:
-                            candidates.append(
-                                {
-                                    "id": record["id"],
-                                    "name": record["name"],
-                                    "similarity_score": record["score"],
-                                    "metadata": {"name": record["name"]},
-                                }
-                            )
+                            raw_score = record["raw_score"]
+                            # Apply context-aware normalization
+                            normalized_score = self._normalize_vector_score(raw_score, query_components)
+                            
+                            # Only include candidates with meaningful scores
+                            if normalized_score > 0.1:  # Minimum threshold
+                                candidates.append(
+                                    {
+                                        "id": record["id"],
+                                        "name": record["name"],
+                                        "similarity_score": normalized_score,
+                                        "raw_similarity_score": raw_score,
+                                        "metadata": {"name": record["name"]},
+                                    }
+                                )
+
+                        # Re-sort by normalized score and limit to top_k
+                        candidates.sort(key=lambda x: x["similarity_score"], reverse=True)
+                        candidates = candidates[:top_k]
 
                         if candidates:
                             print(
-                                f"Found {len(candidates)} candidates using vectorSimilarity"
+                                f"Found {len(candidates)} candidates using vectorSimilarity (normalized)"
                             )
                             return candidates
                     except Exception as cypher_err:
@@ -412,16 +616,18 @@ class GraphRAGPredictor(BasePredictor):
             # Parse query to extract components (skills, etc.)
             query_components = self.extract_query_components(query)
             query_skills = query_components.get("skills", [])
+            priority_skills = query_components.get("priority_skills", [])
             query_role = query_components.get("role", "")
             query_location = query_components.get("location", "")
             query_years = query_components.get("years", 0)
+            seniority = query_components.get("seniority", "mid")
 
             # Ensure query_skills is a list, not a float (fixing type error)
             if not isinstance(query_skills, list):
                 query_skills = []
 
             print(
-                f"Extracted query components: role='{query_role}', location='{query_location}', years={query_years}, skills={query_skills}"
+                f"Extracted query components: role='{query_role}', location='{query_location}', years={query_years}, seniority='{seniority}', skills={query_skills}, priority_skills={priority_skills}"
             )
 
             candidates = []
@@ -446,11 +652,6 @@ class GraphRAGPredictor(BasePredictor):
                         f"Evaluating candidate: {candidate_name} (ID: {candidate_id})"
                     )
 
-                    # Initialize candidate data
-                    matched_skills = []
-                    relevant_skills = []  # Track skills with relevance > 0
-                    graph_matches = []
-
                     # Get all skills for this candidate
                     skills_query = """
                     MATCH (c:Candidate {id: $candidate_id})-[:HAS_SKILL]->(s:Skill)
@@ -465,110 +666,13 @@ class GraphRAGPredictor(BasePredictor):
                         f"  - Found {len(candidate_skills)} skills: {', '.join(candidate_skills[:5])}{'...' if len(candidate_skills) > 5 else ''}"
                     )
 
-                    # Find matching skills
-                    if query_skills and len(query_skills) > 0:
-                        # Preprocess query skills to simplify matching
-                        processed_query_skills = []
-                        for qs in query_skills:
-                            if isinstance(qs, str):
-                                processed_query_skills.append(qs.lower())
-
-                        # Debug output - show what skills we're looking for
-                        print(f"Looking for skills: {processed_query_skills}")
-
-                        # Check each candidate skill against query skills
-                        for skill in candidate_skills:
-                            if not isinstance(skill, str):
-                                continue
-
-                            skill_lower = skill.lower()
-                            skill_matched = False
-
-                            # Try to match the skill directly
-                            for qs in processed_query_skills:
-                                # Make matching more flexible - check if skill is part of query skill or vice versa
-                                if (
-                                    qs in skill_lower
-                                    or skill_lower in qs
-                                    or
-                                    # Also check for common variations (e.g. "sql" might match "postgresql")
-                                    (
-                                        qs == "sql"
-                                        and (
-                                            "sql" in skill_lower
-                                            or "database" in skill_lower
-                                        )
-                                    )
-                                    or (qs == "python" and "python" in skill_lower)
-                                    or
-                                    # Add more common variations as needed
-                                    (
-                                        qs == "javascript"
-                                        and (
-                                            "js" in skill_lower
-                                            or "javascript" in skill_lower
-                                        )
-                                    )
-                                ):
-                                    skill_matched = True
-                                    relevance = 1.0  # Full relevance for direct matches
-                                    break
-
-                            if skill_matched:
-                                matched_skills.append(skill)
-                                relevant_skills.append(skill)
-                                graph_matches.append(
-                                    {
-                                        "type": "skill",
-                                        "skill": {"name": skill},
-                                        "relevance": relevance,
-                                    }
-                                )
-                    else:
-                        # If no specific skills in query, match against job title/role
-                        role = query_components.get("role", "")
-                        if role and isinstance(role, str):
-                            role = role.lower()
-                            for skill in candidate_skills:
-                                # Consider skills relevant if they contain role keywords
-                                is_role_relevant = (
-                                    role in skill.lower()
-                                    if skill and isinstance(skill, str)
-                                    else False
-                                )
-
-                                # Skills are considered relevant if they contain role keywords
-                                relevance = 1.0 if is_role_relevant else 0
-
-                                # Only add skills that are relevant to the role to matched_skills
-                                if is_role_relevant:
-                                    matched_skills.append(skill)
-                                    relevant_skills.append(skill)
-                                    graph_matches.append(
-                                        {
-                                            "type": "skill",
-                                            "skill": {"name": skill},
-                                            "relevance": relevance,
-                                        }
-                                    )
-                                # Add all skills to graph_matches with their relevance scores
-                                # but with zero relevance if not related to role
-                                elif (
-                                    len(matched_skills) < 5
-                                ):  # Only include a few non-relevant skills
-                                    graph_matches.append(
-                                        {
-                                            "type": "skill",
-                                            "skill": {"name": skill},
-                                            "relevance": relevance,
-                                        }
-                                    )
-
-                    print(
-                        f"  - Matched {len(matched_skills)} relevant skills: {', '.join(relevant_skills[:5])}{'...' if len(relevant_skills) > 5 else ''}"
+                    # Calculate skill relevance using improved method
+                    skill_score, matched_skills, skill_details = self._calculate_skill_relevance_score(
+                        candidate_skills, query_components
                     )
+
                     print(
-                        f"  - Added {len(graph_matches)} skills to graph matches (including non-relevant ones)"
+                        f"  - Skill score: {skill_score:.2f}, matched {len(matched_skills)} skills: {', '.join(matched_skills[:5])}{'...' if len(matched_skills) > 5 else ''}"
                     )
 
                     # Get experience for this candidate
@@ -592,19 +696,13 @@ class GraphRAGPredictor(BasePredictor):
                             {"company": company, "title": title, "years": years}
                         )
 
-                        graph_matches.append(
-                            {
-                                "type": "experience",
-                                "experience": {
-                                    "company": company,
-                                    "role": title,
-                                    "years": years,
-                                },
-                            }
-                        )
-
                     print(
                         f"  - Found {len(experiences)} experiences, total {total_years} years"
+                    )
+
+                    # Calculate experience score with improved logic
+                    exp_score = self._calculate_experience_score(
+                        total_years, experiences, query_components
                     )
 
                     # Get location for this candidate
@@ -619,96 +717,59 @@ class GraphRAGPredictor(BasePredictor):
                         location = loc_record.get("location", "")
                         locations.append(location)
 
-                        graph_matches.append(
-                            {
-                                "type": "location",
-                                "location": {"name": location},
-                            }
-                        )
-
                     print(f"  - Locations: {', '.join(locations)}")
 
-                    # Calculate graph score based on matched skills and other factors
-                    graph_score = 0.0
+                    # Calculate location score
+                    loc_score = self._calculate_location_score(locations, query_components)
 
-                    # 1. Skill match component (0-1.0)
-                    skill_score = 0.0
-                    if matched_skills:
-                        if query_skills and len(query_skills) > 0:
-                            # Calculate skill match ratio
-                            matched_ratio = len(matched_skills) / max(
-                                len(query_skills), 1
-                            )
-                            skill_score = min(matched_ratio, 1.0)  # Cap at 1.0
-                        else:
-                            # If no skills in query, use a base score based on number of matched skills
-                            skill_score = min(
-                                len(matched_skills) / 3, 0.8
-                            )  # Cap at 0.8, 3+ relevant skills is good
-                    else:
-                        # No direct skill matches
-                        if query_skills and len(query_skills) > 0:
-                            # No matches when skills were requested, very low score
-                            skill_score = 0.0
-                        else:
-                            # No specific skills requested and no skills matched the role
-                            # Give a minimal score if the candidate has any skills at all
-                            skill_score = (
-                                min(len(candidate_skills) / 20, 0.3)
-                                if candidate_skills
-                                else 0.0
-                            )  # Cap at 0.3
+                    # Calculate adaptive weights based on query characteristics
+                    weights = self._calculate_adaptive_weights(query_components)
 
-                    # 2. Experience match component (0-0.4)
-                    exp_score = 0.0
-                    if total_years > 0:
-                        # Ensure query_years is a number
-                        query_years_value = 0
-                        if isinstance(query_years, (int, float)) and query_years > 0:
-                            query_years_value = query_years
-
-                        if query_years_value > 0:
-                            # Bonus for meeting or exceeding requested years
-                            if total_years >= query_years_value:
-                                exp_score = 0.4
-                            else:
-                                # Partial credit based on how close to requested years
-                                exp_score = 0.4 * (total_years / query_years_value)
-                        else:
-                            # No specific years requested, give points based on experience
-                            exp_score = min(
-                                0.2 * (total_years / 5), 0.3
-                            )  # Max out at 15 years
-
-                    # 3. Location match component (0-0.2)
-                    loc_score = 0.0
-                    if locations and query_location and isinstance(query_location, str):
-                        # Check for location match
-                        query_loc_lower = query_location.lower()
-                        for location in locations:
-                            if (
-                                location
-                                and isinstance(location, str)
-                                and (
-                                    query_loc_lower in location.lower()
-                                    or location.lower() in query_loc_lower
-                                )
-                            ):
-                                loc_score = 0.2
-                                break
-
-                    # Combine scores with weights
+                    # Combine scores with adaptive weights
                     graph_score = (
-                        (0.6 * skill_score) + (0.3 * exp_score) + (0.1 * loc_score)
+                        (weights["skill"] * skill_score) + 
+                        (weights["experience"] * exp_score) + 
+                        (weights["location"] * loc_score)
                     )
 
-                    # Add a minimum score to ensure some results are always returned
-                    if len(graph_matches) > 0:
-                        graph_score = max(graph_score, 0.1)
+                    # Apply minimum score threshold
+                    if len(matched_skills) > 0 or total_years > 0:
+                        graph_score = max(graph_score, 0.05)  # Lower minimum threshold
 
                     print(
-                        f"  - Final graph score: {graph_score:.2f} (skill: {skill_score:.2f}, exp: {exp_score:.2f}, loc: {loc_score:.2f})"
+                        f"  - Final graph score: {graph_score:.2f} (skill: {skill_score:.2f}*{weights['skill']:.1f}, exp: {exp_score:.2f}*{weights['experience']:.1f}, loc: {loc_score:.2f}*{weights['location']:.1f})"
                     )
+
+                    # Build graph matches for explanation
+                    graph_matches = []
+                    
+                    # Add skill matches with details
+                    for skill, details in skill_details.items():
+                        graph_matches.append({
+                            "type": "skill",
+                            "skill": {"name": skill},
+                            "relevance": details["match_score"],
+                            "is_priority": details.get("is_priority", False),
+                            "matched_query_skill": details.get("matched_query_skill", "")
+                        })
+                    
+                    # Add experience matches
+                    for exp in experiences:
+                        graph_matches.append({
+                            "type": "experience",
+                            "experience": {
+                                "company": exp["company"],
+                                "role": exp["title"],
+                                "years": exp["years"],
+                            }
+                        })
+                    
+                    # Add location matches
+                    for location in locations:
+                        graph_matches.append({
+                            "type": "location",
+                            "location": {"name": location}
+                        })
 
                     candidates.append(
                         {
@@ -718,10 +779,17 @@ class GraphRAGPredictor(BasePredictor):
                             "graph_matches": graph_matches,
                             "matched_skills": matched_skills,  # Only relevant/matched skills
                             "all_skills": candidate_skills,  # All skills the candidate has
+                            "skill_details": skill_details,  # Detailed skill matching info
                             "relevant_skill_count": len(matched_skills),
                             "total_skill_count": len(candidate_skills),
                             "total_years_experience": total_years,
                             "locations": locations,
+                            "component_scores": {
+                                "skill_score": skill_score,
+                                "experience_score": exp_score,
+                                "location_score": loc_score
+                            },
+                            "weights": weights
                         }
                     )
 
@@ -739,11 +807,142 @@ class GraphRAGPredictor(BasePredictor):
             traceback.print_exc()
             return []  # Return empty list on error
 
+    def _calculate_experience_score(self, total_years: float, experiences: List[Dict], query_components: Dict) -> float:
+        """Calculate experience score with improved logic."""
+        query_years = query_components.get("years", 0)
+        seniority = query_components.get("seniority", "mid")
+        query_role = query_components.get("role", "").lower()
+        
+        if total_years <= 0:
+            return 0.0
+        
+        # Base score from years of experience
+        exp_score = 0.0
+        
+        if query_years > 0:
+            # Specific years requirement
+            if total_years >= query_years:
+                exp_score = 0.4  # Full score for meeting requirement
+                # Bonus for exceeding requirement (but with diminishing returns)
+                excess_years = total_years - query_years
+                bonus = min(0.1, excess_years * 0.02)  # Max 0.1 bonus
+                exp_score += bonus
+            else:
+                # Partial credit based on how close to requirement
+                exp_score = 0.4 * (total_years / query_years)
+        else:
+            # No specific years requirement, score based on seniority expectations
+            if seniority == "junior":
+                # Junior roles: 0-3 years is ideal
+                if total_years <= 3:
+                    exp_score = 0.3
+                elif total_years <= 5:
+                    exp_score = 0.25  # Slightly overqualified
+                else:
+                    exp_score = 0.2  # Significantly overqualified
+            elif seniority == "senior":
+                # Senior roles: 5+ years expected
+                if total_years >= 5:
+                    exp_score = 0.4
+                    # Bonus for very senior candidates
+                    if total_years >= 10:
+                        exp_score = min(0.5, 0.4 + (total_years - 10) * 0.01)
+                else:
+                    exp_score = 0.4 * (total_years / 5)  # Partial credit
+            else:
+                # Mid-level roles: 2-7 years is good
+                if 2 <= total_years <= 7:
+                    exp_score = 0.35
+                elif total_years < 2:
+                    exp_score = 0.35 * (total_years / 2)
+                else:
+                    exp_score = 0.3  # Overqualified but still good
+        
+        # Bonus for relevant role experience
+        if query_role and experiences:
+            role_keywords = query_role.split()
+            for exp in experiences:
+                exp_title = exp.get("title", "").lower()
+                if any(keyword in exp_title for keyword in role_keywords):
+                    exp_score = min(1.0, exp_score * 1.2)  # 20% bonus for relevant role
+                    break
+        
+        return min(1.0, exp_score)
+
+    def _calculate_location_score(self, locations: List[str], query_components: Dict) -> float:
+        """Calculate location score."""
+        query_location = query_components.get("location", "")
+        
+        if not query_location or not locations:
+            return 0.0
+        
+        query_loc_lower = query_location.lower()
+        for location in locations:
+            if (
+                location
+                and isinstance(location, str)
+                and (
+                    query_loc_lower in location.lower()
+                    or location.lower() in query_loc_lower
+                )
+            ):
+                return 1.0  # Perfect location match
+        
+        return 0.0
+
+    def _calculate_adaptive_weights(self, query_components: Dict) -> Dict[str, float]:
+        """Calculate adaptive weights based on query characteristics."""
+        skills = query_components.get("skills", [])
+        priority_skills = query_components.get("priority_skills", [])
+        years = query_components.get("years", 0)
+        location = query_components.get("location", "")
+        seniority = query_components.get("seniority", "mid")
+        
+        # Base weights
+        skill_weight = 0.6
+        exp_weight = 0.3
+        loc_weight = 0.1
+        
+        # Adjust based on query characteristics
+        if len(skills) > 5 or len(priority_skills) > 2:
+            # Skill-heavy queries - increase skill weight
+            skill_weight = 0.75
+            exp_weight = 0.2
+            loc_weight = 0.05
+        elif years > 0 or seniority in ["senior", "junior"]:
+            # Experience-focused queries
+            skill_weight = 0.5
+            exp_weight = 0.4
+            loc_weight = 0.1
+        elif location:
+            # Location-specific queries
+            skill_weight = 0.5
+            exp_weight = 0.25
+            loc_weight = 0.25
+        
+        # Seniority adjustments
+        if seniority == "senior":
+            # Senior roles care more about experience
+            exp_weight = min(0.5, exp_weight * 1.3)
+            skill_weight = max(0.4, 1.0 - exp_weight - loc_weight)
+        elif seniority == "junior":
+            # Junior roles care more about skills and potential
+            skill_weight = min(0.8, skill_weight * 1.2)
+            exp_weight = max(0.1, 1.0 - skill_weight - loc_weight)
+        
+        # Normalize to ensure weights sum to 1.0
+        total = skill_weight + exp_weight + loc_weight
+        return {
+            "skill": skill_weight / total,
+            "experience": exp_weight / total,
+            "location": loc_weight / total
+        }
+
     def combine_scores(
         self, vector_results: List[Dict], graph_results: List[Dict]
     ) -> List[Dict]:
         """
-        Combine vector and graph scores using a weighted average.
+        Combine vector and graph scores using intelligent weighted averaging.
 
         Args:
             vector_results: Results from vector similarity search
@@ -781,32 +980,23 @@ class GraphRAGPredictor(BasePredictor):
 
             vector_score = vector_item.get("similarity_score", 0)
             graph_score = graph_item.get("graph_score", 0)
+            raw_vector_score = vector_item.get("raw_similarity_score", vector_score)
 
-            # Calculate weights based on availability and quality of data
-            has_vector = vector_score > 0
-            has_graph = graph_score > 0
+            # Assess score quality and reliability
+            vector_quality = self._assess_vector_score_quality(vector_score, raw_vector_score, vector_item)
+            graph_quality = self._assess_graph_score_quality(graph_score, graph_item)
 
-            # Default weights
-            vector_weight = 0.6
-            graph_weight = 0.4
-
-            # Determine more suitable weights
-            if has_vector and has_graph:
-                # Use default weights when both scores are available
-                pass
-            elif has_vector:
-                # Only vector score available, use it exclusively
-                vector_weight = 1.0
-                graph_weight = 0.0
-            elif has_graph:
-                # Only graph score available, use it exclusively
-                vector_weight = 0.0
-                graph_weight = 1.0
-
-            # Apply weighted average
-            combined_score = (vector_weight * vector_score) + (
-                graph_weight * graph_score
+            # Calculate adaptive weights based on score quality and availability
+            weights = self._calculate_combination_weights(
+                vector_score, graph_score, vector_quality, graph_quality, graph_item
             )
+
+            # Apply weighted average with quality adjustments
+            combined_score = (weights["vector"] * vector_score) + (weights["graph"] * graph_score)
+
+            # Apply quality-based adjustments
+            quality_factor = (vector_quality * weights["vector"]) + (graph_quality * weights["graph"])
+            combined_score = combined_score * quality_factor
 
             # Get candidate details from either result
             candidate_details = vector_map.get(cid, graph_map.get(cid, {}))
@@ -820,20 +1010,29 @@ class GraphRAGPredictor(BasePredictor):
             # Get matched skills from graph results
             matched_skills = graph_item.get("matched_skills", [])
             all_skills = graph_item.get("all_skills", [])
+            skill_details = graph_item.get("skill_details", {})
 
             # Get additional data from graph results
             total_years_experience = graph_item.get("total_years_experience", 0)
             locations = graph_item.get("locations", [])
+            component_scores = graph_item.get("component_scores", {})
+            adaptive_weights = graph_item.get("weights", {})
 
             # Construct detailed result
             result = {
                 "id": cid,
                 "name": name,
                 "vector_score": vector_score,
+                "raw_vector_score": raw_vector_score,
                 "graph_score": graph_score,
                 "combined_score": combined_score,
+                "vector_quality": vector_quality,
+                "graph_quality": graph_quality,
+                "combination_weights": weights,
+                "quality_factor": quality_factor,
                 "graph_matches": graph_item.get("graph_matches", []),
                 "matched_skills": matched_skills,
+                "skill_details": skill_details,
             }
 
             # Add additional data if available
@@ -852,6 +1051,12 @@ class GraphRAGPredictor(BasePredictor):
             if locations:
                 result["locations"] = locations
 
+            if component_scores:
+                result["component_scores"] = component_scores
+
+            if adaptive_weights:
+                result["adaptive_weights"] = adaptive_weights
+
             if "match_count" in graph_item:
                 result["match_count"] = graph_item["match_count"]
 
@@ -860,11 +1065,171 @@ class GraphRAGPredictor(BasePredictor):
         # Sort by combined score
         combined_results.sort(key=lambda x: x["combined_score"], reverse=True)
 
+        # Apply final ranking adjustments
+        combined_results = self._apply_ranking_adjustments(combined_results)
+
         # Print summary
         top_score = combined_results[0]["combined_score"] if combined_results else 0
-        print(f"Combined {len(combined_results)} results, top score: {top_score:.2f}")
+        print(f"Combined {len(combined_results)} results, top score: {top_score:.3f}")
 
         return combined_results
+
+    def _assess_vector_score_quality(self, normalized_score: float, raw_score: float, vector_item: Dict) -> float:
+        """Assess the quality/reliability of a vector similarity score."""
+        if normalized_score <= 0:
+            return 0.0
+        
+        quality = 1.0
+        
+        # Penalize very high raw scores that might be false positives
+        if raw_score > 0.98:
+            quality *= 0.7  # Likely duplicate or near-duplicate
+        elif raw_score > 0.95:
+            quality *= 0.85  # Possibly too similar
+        
+        # Penalize very low scores
+        if normalized_score < 0.3:
+            quality *= 0.6  # Low confidence in match
+        
+        # Boost moderate-high scores that are likely genuine matches
+        if 0.6 <= normalized_score <= 0.9:
+            quality *= 1.1  # Sweet spot for genuine relevance
+        
+        return min(1.0, quality)
+
+    def _assess_graph_score_quality(self, graph_score: float, graph_item: Dict) -> float:
+        """Assess the quality/reliability of a graph-based score."""
+        if graph_score <= 0:
+            return 0.0
+        
+        quality = 1.0
+        
+        # Check if we have meaningful skill matches
+        matched_skills = graph_item.get("matched_skills", [])
+        skill_details = graph_item.get("skill_details", {})
+        component_scores = graph_item.get("component_scores", {})
+        
+        # Quality based on skill match quality
+        if matched_skills and skill_details:
+            avg_skill_match_score = sum(
+                details.get("match_score", 0) for details in skill_details.values()
+            ) / len(skill_details)
+            
+            if avg_skill_match_score > 0.8:
+                quality *= 1.2  # High-quality skill matches
+            elif avg_skill_match_score < 0.6:
+                quality *= 0.8  # Lower-quality skill matches
+        
+        # Quality based on component score distribution
+        skill_score = component_scores.get("skill_score", 0)
+        exp_score = component_scores.get("experience_score", 0)
+        
+        # Prefer candidates with balanced scores rather than single high component
+        if skill_score > 0 and exp_score > 0:
+            quality *= 1.1  # Balanced candidate
+        elif skill_score > 0.8 and exp_score == 0:
+            quality *= 0.9  # Skills-only match
+        elif exp_score > 0.5 and skill_score == 0:
+            quality *= 0.7  # Experience-only match (less reliable)
+        
+        # Penalize artificially inflated scores
+        if graph_score > 0.9 and len(matched_skills) < 2:
+            quality *= 0.6  # High score with few matches is suspicious
+        
+        return min(1.0, quality)
+
+    def _calculate_combination_weights(
+        self, vector_score: float, graph_score: float, 
+        vector_quality: float, graph_quality: float, graph_item: Dict
+    ) -> Dict[str, float]:
+        """Calculate adaptive weights for combining vector and graph scores."""
+        
+        # Base weights
+        vector_weight = 0.4
+        graph_weight = 0.6
+        
+        # Adjust based on score availability and quality
+        has_vector = vector_score > 0
+        has_graph = graph_score > 0
+        
+        if not has_vector and not has_graph:
+            return {"vector": 0.0, "graph": 0.0}
+        elif not has_vector:
+            return {"vector": 0.0, "graph": 1.0}
+        elif not has_graph:
+            return {"vector": 1.0, "graph": 0.0}
+        
+        # Adjust weights based on quality
+        quality_ratio = vector_quality / (vector_quality + graph_quality) if (vector_quality + graph_quality) > 0 else 0.5
+        
+        # Adjust based on graph match richness
+        matched_skills = graph_item.get("matched_skills", [])
+        skill_details = graph_item.get("skill_details", {})
+        
+        if len(matched_skills) >= 3 and skill_details:
+            # Rich graph data - trust graph more
+            graph_weight = min(0.8, graph_weight * 1.3)
+        elif len(matched_skills) <= 1:
+            # Sparse graph data - trust vector more
+            vector_weight = min(0.8, vector_weight * 1.3)
+        
+        # Adjust based on score magnitudes
+        if vector_score > 0.8 and graph_score < 0.3:
+            # High vector, low graph - trust vector more
+            vector_weight = min(0.8, vector_weight * 1.4)
+        elif graph_score > 0.7 and vector_score < 0.4:
+            # High graph, low vector - trust graph more
+            graph_weight = min(0.8, graph_weight * 1.4)
+        
+        # Apply quality-based final adjustment
+        vector_weight = vector_weight * (0.5 + 0.5 * vector_quality)
+        graph_weight = graph_weight * (0.5 + 0.5 * graph_quality)
+        
+        # Normalize
+        total = vector_weight + graph_weight
+        if total > 0:
+            return {
+                "vector": vector_weight / total,
+                "graph": graph_weight / total
+            }
+        else:
+            return {"vector": 0.5, "graph": 0.5}
+
+    def _apply_ranking_adjustments(self, results: List[Dict]) -> List[Dict]:
+        """Apply final ranking adjustments to improve result quality."""
+        if not results:
+            return results
+        
+        # Calculate percentile-based adjustments
+        scores = [r["combined_score"] for r in results]
+        if len(scores) > 1:
+            score_range = max(scores) - min(scores)
+            
+            for i, result in enumerate(results):
+                # Boost candidates with high-quality skill matches
+                skill_details = result.get("skill_details", {})
+                if skill_details:
+                    priority_matches = sum(
+                        1 for details in skill_details.values() 
+                        if details.get("is_priority", False)
+                    )
+                    if priority_matches > 0:
+                        # Boost for priority skill matches
+                        boost = min(0.1, priority_matches * 0.03)
+                        result["combined_score"] = min(1.0, result["combined_score"] + boost)
+                
+                # Penalize candidates with very low component scores
+                component_scores = result.get("component_scores", {})
+                if component_scores:
+                    skill_score = component_scores.get("skill_score", 0)
+                    if skill_score < 0.1 and result["combined_score"] > 0.5:
+                        # High combined score but very low skill score is suspicious
+                        result["combined_score"] *= 0.8
+        
+        # Re-sort after adjustments
+        results.sort(key=lambda x: x["combined_score"], reverse=True)
+        
+        return results
 
     def predict(
         self,

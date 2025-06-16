@@ -288,14 +288,14 @@ async def debug_candidates(job_query: str = "Data Scientist with PyTorch, Python
                 # 1. Vector search
                 try:
                     vector_results = predictor.score_candidates_vector(
-                        job_query, top_k=2
+                        job_query, top_k=3
                     )
                 except Exception as e:
                     vector_results = {"error": str(e)}
 
                 # 2. Graph search
                 try:
-                    graph_results = predictor.score_candidates_graph(job_query, top_k=2)
+                    graph_results = predictor.score_candidates_graph(job_query, top_k=3)
                 except Exception as e:
                     graph_results = {"error": str(e)}
 
