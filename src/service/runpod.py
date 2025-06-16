@@ -166,9 +166,11 @@ class RunPodManager:
             if response.status_code != 200 or not response.text.strip():
                 return {"is_ready": False}
 
+            # Set the environment variable for the current process
             os.environ["RUNPOD_ENDPOINT_URL"] = url
 
-            return {"is_ready": True}
+            # Return success with the endpoint URL for the client to use
+            return {"is_ready": True, "endpoint_url": url}
 
         except Exception as e:
             print(f"Failed to check endpoint status: {str(e)}")

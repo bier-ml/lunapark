@@ -27,7 +27,7 @@ def extract_score(response):
 
 def send_request_to_ai(messages):
     response = requests.post(
-        "http://localhost:5001/v1/chat/completions", json={"messages": messages}
+        "http://localhost:1234/v1/chat/completions", json={"messages": messages}
     )
     return extract_message(response, ["choices", 0, "message", "content"])
 
