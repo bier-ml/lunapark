@@ -65,7 +65,7 @@ class PDFToText:
 #         self._login()
 
 #     def _init_driver(self):
-#         options = webdriver.Ch romeOptions()
+#         options = webdriver.ChromeOptions()
 #         options.add_argument("--headless")  # Run browser in headless mode
 #         return webdriver.Chrome(
 #             service=Service(ChromeDriverManager().install()), options=options
