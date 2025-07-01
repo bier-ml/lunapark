@@ -1,5 +1,6 @@
 import unicodedata
 import requests
+import os
 from src.platform.base_summarizer import BaseSummarizer
 
 
@@ -10,7 +11,7 @@ class VacancySummarizer(BaseSummarizer):
 
     def __init__(
         self,
-        api_base_url: str = "http://host.docker.internal:5001/v1",
+        api_base_url: str = None,
         api_key: str = "not-needed",  # LM Studio, for example, doesn't need real key
         model: str = "",
         temperature: float = 0.7,
@@ -27,7 +28,7 @@ class VacancySummarizer(BaseSummarizer):
             max_tokens: Maximum tokens in the response
         """
         super().__init__()
-        self.api_base_url = api_base_url
+        self.api_base_url = api_base_url or os.getenv("LM_API_BASE_URL", "http://host.docker.internal:5001/v1")
         self.api_key = api_key
         self.model = model
         self.temperature = temperature
@@ -64,7 +65,7 @@ You are an expert summarizer. Summarize the provided job vacancy into the follow
 4. Preferred Qualifications – Include any optional or nice-to-have qualifications, experiences, or skills.
 5. Technologies and Tools – Extract all mentioned technical tools, programming languages, frameworks, platforms, and methodologies.
 
-Do not include any company-specific promotional text, location, compensation, or benefits unless they directly relate to the job’s technical or skill requirements. Present the summary in a clean and readable format, using bullet points or concise sections.
+Do not include any company-specific promotional text, location, compensation, or benefits unless they directly relate to the job's technical or skill requirements. Present the summary in a clean and readable format, using bullet points or concise sections.
 <|im_end|>"""},
                 {"role": "user", "content": self.clean_unicode_text(prompt)}],
             "temperature": self.temperature,
