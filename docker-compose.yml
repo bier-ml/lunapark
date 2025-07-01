@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile.streamlit
     ports:
-      - 8501
+      - "8501:8501"
     depends_on:
       - backend
     environment:
@@ -21,10 +21,10 @@ services:
       context: .
       dockerfile: Dockerfile.fastapi
     ports:
-      - 8000
+      - "8000:8000"
     environment:
       - LM_API_BASE_URL=${LM_API_BASE_URL:-http://host.docker.internal:5001/v1}
-      - RUNPOD_API_KEY=${RUNPOD_API_KEY:?RUNPOD_API_KEY is required}
+      - RUNPOD_API_KEY=${RUNPOD_API_KEY}
       - RUNPOD_ENDPOINT_URL=${RUNPOD_ENDPOINT_URL}
     env_file:
       - .env

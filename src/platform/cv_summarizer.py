@@ -27,7 +27,7 @@ class CVSummarizer(BaseSummarizer):
             max_tokens: Maximum tokens in the response
         """
         super().__init__()
-        self.api_base_url = api_base_url or os.getenv("LM_API_BASE_URL", "http://host.docker.internal:5001/v1")
+        self.api_base_url = api_base_url or os.getenv("RUNPOD_ENDPOINT_URL") or os.getenv("LM_API_BASE_URL", "http://host.docker.internal:5001/v1")
         self.api_key = api_key
         self.model = model
         self.temperature = temperature
@@ -46,6 +46,14 @@ class CVSummarizer(BaseSummarizer):
         Raises:
             Exception: If the API call fails
         """
+        # Get the API base URL dynamically to pick up any runtime changes
+        api_base_url = self.api_base_url or os.getenv("RUNPOD_ENDPOINT_URL") or os.getenv("LM_API_BASE_URL", "http://host.docker.internal:5001/v1")
+        
+        # Debug logging to see what URL is being used
+        print(f"DEBUG: Using API base URL: {api_base_url}")
+        print(f"DEBUG: RUNPOD_ENDPOINT_URL = {os.getenv('RUNPOD_ENDPOINT_URL')}")
+        print(f"DEBUG: LM_API_BASE_URL = {os.getenv('LM_API_BASE_URL')}")
+        
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
@@ -72,7 +80,7 @@ Do not include any personal information such as names, addresses, phone numbers,
         }
 
         response = requests.post(
-            f"{self.api_base_url}/chat/completions",
+            f"{api_base_url}/chat/completions",
             headers=headers,
             json=payload,
         )

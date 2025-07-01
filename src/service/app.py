@@ -32,9 +32,11 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Initialize summarizers with environment variable support
 cv_summarizer = CVSummarizer(model="lmstudio-community/gemma-2-9b-it-GGUF")
 vacancy_summarizer = VacancySummarizer(model="lmstudio-community/gemma-2-9b-it-GGUF")
 
+# Initialize Airtable clients
 cv_airtable_client = AirtableClient(
     api_key=os.getenv("AIRTABLE_API_KEY"),
     base_id=os.getenv("AIRTABLE_BASE_ID"),
@@ -53,44 +55,12 @@ pair_airtable_client = AirtableClient(
     table_id=os.getenv("AIRTABLE_PAIR_TABLE_ID"),
 )
 
+# Initialize managers
 cv_manager = CVManager(airtable_client=cv_airtable_client)
 vacancy_manager = VacancyManager(airtable_client=vacancy_airtable_client)
 pair_manager = PairManager(airtable_client=pair_airtable_client)
 
-cv_summarizer = CVSummarizer(model="lmstudio-community/gemma-2-9b-it-GGUF")
-vacancy_summarizer = VacancySummarizer(model="lmstudio-community/gemma-2-9b-it-GGUF")
-
-cv_airtable_client = AirtableClient(
-    api_key=os.getenv("AIRTABLE_API_KEY"),
-    base_id=os.getenv("AIRTABLE_BASE_ID"),
-    table_id=os.getenv("AIRTABLE_CV_TABLE_ID"),
-)
-
-vacancy_airtable_client = AirtableClient(
-    api_key=os.getenv("AIRTABLE_API_KEY"),
-    base_id=os.getenv("AIRTABLE_BASE_ID"),
-    table_id=os.getenv("AIRTABLE_VACANCY_TABLE_ID"),
-)
-
-pair_airtable_client = AirtableClient(
-    api_key=os.getenv("AIRTABLE_API_KEY"),
-    base_id=os.getenv("AIRTABLE_BASE_ID"),
-    table_id=os.getenv("AIRTABLE_PAIR_TABLE_ID"),
-)
-
-cv_manager = CVManager(airtable_client=cv_airtable_client)
-vacancy_manager = VacancyManager(airtable_client=vacancy_airtable_client)
-pair_manager = PairManager(airtable_client=pair_airtable_client)
-
-
-# Initialize RunPod manager as a global variable, but with proper error handling
-try:
-    runpod_manager = RunPodManager()
-except Exception as e:
-    print(f"Warning: Failed to initialize RunPod manager: {str(e)}")
-    runpod_manager = None
-
-# Initialize RunPod manager as a global variable, but with proper error handling
+# Initialize RunPod manager with error handling
 try:
     runpod_manager = RunPodManager()
 except Exception as e:
