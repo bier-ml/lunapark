@@ -234,8 +234,8 @@ class RunPodManager:
 
         except Exception as e:
             print(f"Failed to check endpoint status: {str(e)}")
-            return {
-                "is_ready": False,
-                "status": "ERROR",
-                "status_message": f"Error checking status: {str(e)}"
-            }
+            # return {
+            #     "is_ready": False,
+            #     "status": "ERROR",
+            #     "status_message": f"Error checking status: {str(e)}"
+            # }

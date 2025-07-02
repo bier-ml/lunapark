@@ -9,6 +9,122 @@ from tools import PDFToText  # type: ignore
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 
+def check_pod_status():
+    """Check pod status without causing page refreshes."""
+    try:
+        response = requests.get(f"{API_URL}/pods", timeout=180)
+        if response.status_code == 200:
+            pods = response.json().get("pods", [])
+            if pods:
+                pod = pods[0]
+                pod_id = pod["pod_id"]
+                
+                status_response = requests.get(
+                    f"{API_URL}/pods/{pod_id}/status", timeout=180
+                )
+                if status_response.status_code == 200:
+                    status_data = status_response.json()
+                    return {
+                        "exists": True,
+                        "pod_id": pod_id,
+                        "status": status_data.get("status", "Unknown"),
+                        "message": status_data.get("status_message", "No status message"),
+                        "is_ready": status_data.get("is_ready", False)
+                    }
+                else:
+                    return {"exists": True, "pod_id": pod_id, "error": "Failed to check status"}
+            else:
+                return {"exists": False}
+        else:
+            return {"error": f"Failed to get pods: {response.status_code}"}
+    except requests.exceptions.RequestException as e:
+        return {"error": f"Connection error: {str(e)}"}
+
+
+def render_pod_management():
+    """Render the GPU pod management section with manual controls."""
+    st.markdown("## 🖥️ GPU Pod Management")
+    
+    # Create columns for status and controls
+    status_col, control_col = st.columns([2, 1])
+    
+    # Manual refresh button
+    if control_col.button("🔄 Refresh Status", key="refresh_status"):
+        st.session_state.force_status_check = True
+    
+    # Only check status if forced or first load
+    if st.session_state.get("force_status_check", True):
+        with status_col:
+            with st.spinner("Checking GPU Pod status..."):
+                pod_info = check_pod_status()
+        
+        # Clear the force check flag
+        st.session_state.force_status_check = False
+        st.session_state.pod_info = pod_info
+    else:
+        pod_info = st.session_state.get("pod_info", {"exists": False})
+    
+    # Display status
+    with status_col:
+        if "error" in pod_info:
+            st.error(f"❌ {pod_info['error']}")
+        elif pod_info.get("exists"):
+            pod_status = pod_info.get("status", "Unknown")
+            status_message = pod_info.get("message", "")
+            is_ready = pod_info.get("is_ready", False)
+            
+            st.markdown(f"**Pod Status:** {pod_status}")
+            
+            if is_ready:
+                st.success(f"✅ {status_message}")
+            elif pod_status == "INITIALIZING":
+                st.info(f"🔄 {status_message}")
+                st.info("💡 Click 'Refresh Status' to check progress")
+            elif pod_status == "STARTING":
+                st.warning(f"⏳ {status_message}")
+                st.info("💡 Click 'Refresh Status' to check progress")
+            elif pod_status == "ERROR":
+                st.error(f"❌ {status_message}")
+            else:
+                st.info(f"ℹ️ {status_message}")
+        else:
+            st.info("No GPU Pod running")
+    
+    # Control buttons
+    with control_col:
+        if pod_info.get("exists"):
+            pod_id = pod_info.get("pod_id")
+            if st.button("🛑 Terminate Pod", key="terminate_pod"):
+                with st.spinner("Terminating GPU Pod..."):
+                    try:
+                        delete_response = requests.delete(
+                            f"{API_URL}/pods/{pod_id}", timeout=180
+                        )
+                        if delete_response.status_code == 200:
+                            st.success("Pod terminated successfully!")
+                            st.session_state.force_status_check = True
+                            time.sleep(2)  # Brief pause to let termination complete
+                            st.rerun()
+                        else:
+                            st.error("Failed to terminate GPU Pod")
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"Error terminating pod: {str(e)}")
+        else:
+            if st.button("🚀 Create GPU Pod", key="create_pod"):
+                with st.spinner("Creating GPU Pod..."):
+                    try:
+                        response = requests.post(f"{API_URL}/pods", timeout=180)
+                        if response.status_code == 200:
+                            st.success("Pod creation initiated!")
+                            st.session_state.force_status_check = True
+                            time.sleep(2)  # Brief pause to let creation start
+                            st.rerun()
+                        else:
+                            st.error("Failed to create GPU Pod")
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"Error creating pod: {str(e)}")
+
+
 def main():
     """Main application function containing all the Streamlit app logic."""
     # Page Configuration
@@ -27,124 +143,8 @@ def main():
         unsafe_allow_html=True,
     )
 
-    # GPU Pod Management
-    st.markdown("## 🖥️ GPU Pod Management")
-    max_retries = 100
-
-    try:
-        # Initialize retry counter in session state if not exists
-        if "status_check_count" not in st.session_state:
-            st.session_state.status_check_count = 0
-
-        # Check if pod exists and is ready
-        with st.spinner("Checking GPU Pod status..."):
-            # Get pods list
-            response = requests.get(f"{API_URL}/pods", timeout=180)
-            if response.status_code == 200:
-                pods = response.json().get("pods", [])
-                if pods:
-                    pod = pods[0]
-                    pod_id = pod["pod_id"]
-
-                    # Check pod status
-                    status_response = requests.get(
-                        f"{API_URL}/pods/{pod_id}/status", timeout=180
-                    )
-                    if status_response.status_code == 200:
-                        status_data = status_response.json()
-                        pod_status = status_data.get("status", "Unknown")
-                        status_message = status_data.get("status_message", "No status message")
-                        is_ready = status_data.get("is_ready", False)
-                        
-                        # Display pod status with appropriate indicators
-                        st.markdown(f"**Pod Status:** {pod_status}")
-                        
-                        if is_ready:
-                            # Pod is ready - show success status and terminate button
-                            st.session_state.status_check_count = 0  # Reset counter
-                            st.success(f"✅ {status_message}")
-                            if st.button("🛑 Terminate GPU Pod"):
-                                with st.spinner("Terminating GPU Pod..."):
-                                    delete_response = requests.delete(
-                                        f"{API_URL}/pods/{pod_id}", timeout=180
-                                    )
-                                    if delete_response.status_code == 200:
-                                        st.rerun()
-                                    else:
-                                        st.error("Failed to terminate GPU Pod")
-                        elif pod_status == "INITIALIZING":
-                            # Pod is running but LLM not ready yet
-                            st.session_state.status_check_count += 1
-                            st.info(f"🔄 {status_message}")
-                            
-                            if st.session_state.status_check_count >= max_retries:
-                                st.error("Pod initialization timeout. Terminating pod...")
-                                delete_response = requests.delete(
-                                    f"{API_URL}/pods/{pod_id}", timeout=180
-                                )
-                                st.session_state.status_check_count = 0  # Reset counter
-                                st.rerun()
-                            else:
-                                time.sleep(10)
-                                st.rerun()
-                        elif pod_status == "STARTING":
-                            # Pod is starting up
-                            st.session_state.status_check_count += 1
-                            st.warning(f"⏳ {status_message}")
-                            
-                            if st.session_state.status_check_count >= max_retries:
-                                st.error("Pod startup timeout. Terminating pod...")
-                                delete_response = requests.delete(
-                                    f"{API_URL}/pods/{pod_id}", timeout=180
-                                )
-                                st.session_state.status_check_count = 0  # Reset counter
-                                st.rerun()
-                            else:
-                                time.sleep(10)
-                                st.rerun()
-                        elif pod_status == "ERROR":
-                            # Error occurred
-                            st.error(f"❌ {status_message}")
-                            if st.button("🛑 Terminate Failed Pod"):
-                                with st.spinner("Terminating failed pod..."):
-                                    delete_response = requests.delete(
-                                        f"{API_URL}/pods/{pod_id}", timeout=180
-                                    )
-                                    if delete_response.status_code == 200:
-                                        st.rerun()
-                                    else:
-                                        st.error("Failed to terminate pod")
-                        else:
-                            # Other status
-                            st.session_state.status_check_count += 1
-                            st.info(f"ℹ️ {status_message}")
-                            
-                            if st.session_state.status_check_count >= max_retries:
-                                st.error("Pod timeout. Terminating pod...")
-                                delete_response = requests.delete(
-                                    f"{API_URL}/pods/{pod_id}", timeout=180
-                                )
-                                st.session_state.status_check_count = 0  # Reset counter
-                                st.rerun()
-                            else:
-                                time.sleep(10)
-                                st.rerun()
-                    else:
-                        st.error("Failed to check pod status")
-                        st.session_state.status_check_count = 0
-                else:
-                    # No pods - show create button
-                    st.session_state.status_check_count = 0  # Reset counter
-                    st.info("No GPU Pod running")
-                    if st.button("🚀 Create GPU Pod"):
-                        response = requests.post(f"{API_URL}/pods", timeout=180)
-                        if response.status_code == 200:
-                            time.sleep(10)
-                            st.rerun()
-                        else:
-                            st.error("Failed to create GPU Pod")
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error managing GPU pod: {str(e)}")
+    # GPU Pod Management with improved stability
+    render_pod_management()
 
     # Get available predictors and models
     try:
