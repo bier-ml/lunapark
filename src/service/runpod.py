@@ -178,7 +178,8 @@ class RunPodManager:
                 }
             
             pod_desired_status = pod_status.get("desiredStatus", "Unknown")
-            pod_runtime_status = pod_status.get("runtime", {}).get("status", "Unknown")
+            runtime_info = pod_status.get("runtime")
+            pod_runtime_status = runtime_info.get("status", "Unknown") if runtime_info else "Unknown"
             
             # Check if base endpoint is accessible (without /v1)
             try:
@@ -234,8 +235,8 @@ class RunPodManager:
 
         except Exception as e:
             print(f"Failed to check endpoint status: {str(e)}")
-            # return {
-            #     "is_ready": False,
-            #     "status": "ERROR",
-            #     "status_message": f"Error checking status: {str(e)}"
-            # }
+            return {
+                "is_ready": False,
+                "status": "ERROR",
+                "status_message": f"Error checking status: {str(e)}"
+            }
