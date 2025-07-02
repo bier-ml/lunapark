@@ -24,13 +24,16 @@ def check_pod_status():
                 )
                 if status_response.status_code == 200:
                     status_data = status_response.json()
-                    return {
-                        "exists": True,
-                        "pod_id": pod_id,
-                        "status": status_data.get("status", "Unknown"),
-                        "message": status_data.get("status_message", "No status message"),
-                        "is_ready": status_data.get("is_ready", False)
-                    }
+                    if status_data is not None:
+                        return {
+                            "exists": True,
+                            "pod_id": pod_id,
+                            "status": status_data.get("status", "Unknown"),
+                            "message": status_data.get("status_message", "No status message"),
+                            "is_ready": status_data.get("is_ready", False)
+                        }
+                    else:
+                        return {"exists": True, "pod_id": pod_id, "error": "Empty response from status endpoint"}
                 else:
                     return {"exists": True, "pod_id": pod_id, "error": "Failed to check status"}
             else:
