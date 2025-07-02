@@ -46,7 +46,7 @@ def render_pod_management():
     st.markdown("## 🖥️ GPU Pod Management")
     
     # Create columns for status and controls
-    status_col, control_col = st.columns([2, 1])
+    status_col, control_col = st.columns([1, 1])
     
     # Manual refresh button
     if control_col.button("🔄 Refresh Status", key="refresh_status"):
