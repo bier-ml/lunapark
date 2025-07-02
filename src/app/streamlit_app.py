@@ -14,9 +14,16 @@ def check_pod_status():
     try:
         response = requests.get(f"{API_URL}/pods", timeout=180)
         if response.status_code == 200:
-            pods = response.json().get("pods", [])
-            if pods:
+            response_data = response.json()
+            if response_data is None:
+                return {"error": "Empty response from pods endpoint"}
+            
+            pods = response_data.get("pods", [])
+            if pods and len(pods) > 0:
                 pod = pods[0]
+                if pod is None or "pod_id" not in pod:
+                    return {"error": "Invalid pod data structure"}
+                
                 pod_id = pod["pod_id"]
                 
                 status_response = requests.get(
@@ -42,6 +49,8 @@ def check_pod_status():
             return {"error": f"Failed to get pods: {response.status_code}"}
     except requests.exceptions.RequestException as e:
         return {"error": f"Connection error: {str(e)}"}
+    except Exception as e:
+        return {"error": f"Unexpected error: {str(e)}"}
 
 
 def render_pod_management():
