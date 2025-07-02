@@ -23,7 +23,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - LM_API_BASE_URL=${LM_API_BASE_URL:-http://host.docker.internal:5001/v1}
+      - LM_API_BASE_URL=${LM_API_BASE_URL}
       - RUNPOD_API_KEY=${RUNPOD_API_KEY}
       - RUNPOD_ENDPOINT_URL=${RUNPOD_ENDPOINT_URL}
     env_file:

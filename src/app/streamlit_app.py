@@ -52,10 +52,17 @@ def main():
                     )
                     if status_response.status_code == 200:
                         status_data = status_response.json()
-                        if status_data.get("is_ready"):
-                            # Pod is ready - show status and terminate button
+                        pod_status = status_data.get("status", "Unknown")
+                        status_message = status_data.get("status_message", "No status message")
+                        is_ready = status_data.get("is_ready", False)
+                        
+                        # Display pod status with appropriate indicators
+                        st.markdown(f"**Pod Status:** {pod_status}")
+                        
+                        if is_ready:
+                            # Pod is ready - show success status and terminate button
                             st.session_state.status_check_count = 0  # Reset counter
-                            st.success("✅ GPU Pod is ready")
+                            st.success(f"✅ {status_message}")
                             if st.button("🛑 Terminate GPU Pod"):
                                 with st.spinner("Terminating GPU Pod..."):
                                     delete_response = requests.delete(
@@ -65,11 +72,27 @@ def main():
                                         st.rerun()
                                     else:
                                         st.error("Failed to terminate GPU Pod")
-                        else:
-                            # Increment counter and check if exceeded max retries
+                        elif pod_status == "INITIALIZING":
+                            # Pod is running but LLM not ready yet
                             st.session_state.status_check_count += 1
+                            st.info(f"🔄 {status_message}")
+                            
                             if st.session_state.status_check_count >= max_retries:
-                                # Terminate pod after too many retries
+                                st.error("Pod initialization timeout. Terminating pod...")
+                                delete_response = requests.delete(
+                                    f"{API_URL}/pods/{pod_id}", timeout=180
+                                )
+                                st.session_state.status_check_count = 0  # Reset counter
+                                st.rerun()
+                            else:
+                                time.sleep(10)
+                                st.rerun()
+                        elif pod_status == "STARTING":
+                            # Pod is starting up
+                            st.session_state.status_check_count += 1
+                            st.warning(f"⏳ {status_message}")
+                            
+                            if st.session_state.status_check_count >= max_retries:
                                 st.error("Pod startup timeout. Terminating pod...")
                                 delete_response = requests.delete(
                                     f"{API_URL}/pods/{pod_id}", timeout=180
@@ -77,12 +100,42 @@ def main():
                                 st.session_state.status_check_count = 0  # Reset counter
                                 st.rerun()
                             else:
-                                # Pod exists but not ready - keep spinner and refresh
                                 time.sleep(10)
                                 st.rerun()
+                        elif pod_status == "ERROR":
+                            # Error occurred
+                            st.error(f"❌ {status_message}")
+                            if st.button("🛑 Terminate Failed Pod"):
+                                with st.spinner("Terminating failed pod..."):
+                                    delete_response = requests.delete(
+                                        f"{API_URL}/pods/{pod_id}", timeout=180
+                                    )
+                                    if delete_response.status_code == 200:
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to terminate pod")
+                        else:
+                            # Other status
+                            st.session_state.status_check_count += 1
+                            st.info(f"ℹ️ {status_message}")
+                            
+                            if st.session_state.status_check_count >= max_retries:
+                                st.error("Pod timeout. Terminating pod...")
+                                delete_response = requests.delete(
+                                    f"{API_URL}/pods/{pod_id}", timeout=180
+                                )
+                                st.session_state.status_check_count = 0  # Reset counter
+                                st.rerun()
+                            else:
+                                time.sleep(10)
+                                st.rerun()
+                    else:
+                        st.error("Failed to check pod status")
+                        st.session_state.status_check_count = 0
                 else:
                     # No pods - show create button
                     st.session_state.status_check_count = 0  # Reset counter
+                    st.info("No GPU Pod running")
                     if st.button("🚀 Create GPU Pod"):
                         response = requests.post(f"{API_URL}/pods", timeout=180)
                         if response.status_code == 200:

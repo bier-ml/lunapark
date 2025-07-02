@@ -105,9 +105,15 @@ class RunPodManager:
                 raise Exception("Invalid response from RunPod API")
 
             pod_id = pod["id"]
+            endpoint_base_url = f"https://{pod_id}-5001.proxy.runpod.net"
+            
+            # Set the environment variable immediately without /v1
+            os.environ["RUNPOD_ENDPOINT_URL"] = f"{endpoint_base_url}/v1"
+            
             return {
                 "pod_id": pod_id,
-                "endpoint_url": f"https://{pod_id}-5001.proxy.runpod.net/v1",
+                "endpoint_url": f"{endpoint_base_url}/v1",
+                "endpoint_base_url": endpoint_base_url,
                 "status": "STARTING",
                 "status_message": "Pod is starting...",
             }
@@ -159,17 +165,77 @@ class RunPodManager:
     def check_endpoint_status(self, pod_id: str) -> Dict:
         """Check if the LLM endpoint is ready."""
         url = f"https://{pod_id}-5001.proxy.runpod.net/v1"
+        base_url = f"https://{pod_id}-5001.proxy.runpod.net"
 
         try:
-            response = requests.get(f"{url}/models", timeout=30)
+            # First check if the pod exists and get its status
+            pod_status = runpod.get_pod(pod_id)
+            if not pod_status:
+                return {
+                    "is_ready": False,
+                    "status": "NOT_FOUND",
+                    "status_message": "Pod not found"
+                }
+            
+            pod_desired_status = pod_status.get("desiredStatus", "Unknown")
+            pod_runtime_status = pod_status.get("runtime", {}).get("status", "Unknown")
+            
+            # Check if base endpoint is accessible (without /v1)
+            try:
+                base_response = requests.get(base_url, timeout=10)
+                base_accessible = base_response.status_code == 200
+            except:
+                base_accessible = False
+            
+            # Check if LLM endpoint is ready
+            try:
+                response = requests.get(f"{url}/models", timeout=30)
+                llm_ready = response.status_code == 200 and response.text.strip()
+            except:
+                llm_ready = False
 
-            if response.status_code != 200 or not response.text.strip():
-                return {"is_ready": False}
-
-            os.environ["RUNPOD_ENDPOINT_URL"] = url
-
-            return {"is_ready": True}
+            if llm_ready:
+                # LLM is fully ready
+                os.environ["RUNPOD_ENDPOINT_URL"] = url
+                return {
+                    "is_ready": True,
+                    "status": "RUNNING",
+                    "status_message": "Pod is running and LLM is ready",
+                    "pod_status": pod_desired_status,
+                    "runtime_status": pod_runtime_status
+                }
+            elif base_accessible:
+                # Pod is running but LLM not ready yet
+                return {
+                    "is_ready": False,
+                    "status": "INITIALIZING", 
+                    "status_message": "Pod is running, LLM is initializing",
+                    "pod_status": pod_desired_status,
+                    "runtime_status": pod_runtime_status
+                }
+            elif pod_desired_status == "RUNNING" or pod_runtime_status == "RUNNING":
+                # Pod should be running but not accessible yet
+                return {
+                    "is_ready": False,
+                    "status": "STARTING",
+                    "status_message": "Pod is starting up",
+                    "pod_status": pod_desired_status,
+                    "runtime_status": pod_runtime_status
+                }
+            else:
+                # Pod is in some other state
+                return {
+                    "is_ready": False,
+                    "status": pod_desired_status,
+                    "status_message": f"Pod status: {pod_desired_status}",
+                    "pod_status": pod_desired_status,
+                    "runtime_status": pod_runtime_status
+                }
 
         except Exception as e:
             print(f"Failed to check endpoint status: {str(e)}")
-            return {"is_ready": False}
+            return {
+                "is_ready": False,
+                "status": "ERROR",
+                "status_message": f"Error checking status: {str(e)}"
+            }
